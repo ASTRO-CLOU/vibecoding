@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🐍 Python Course — freeCodeCamp Style</title>
+
+  <!-- Tailwind 3.4 -->
+  <script src="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.17/dist/tailwind.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/lucide.js"></script>
+
+  <!-- CodeMirror 6 + Python mode + Material theme -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@6.0.1/lib/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@6.0.1/theme/material.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@6.0.1/lib/codemirror.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@6.0.1/mode/python/python.min.js"></script>
+
+  <!-- Pyodide 0.26 (Python 3.11 + numpy + matplotlib) -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js" defer></script>
+
+  <style>
+    /* === fCC-like dark theme === */
+    .dark\:bg-base-0 { background-color: #0d1117; }
+    .dark\:bg-base-1 { background-color: #161b22; }
+    .dark\:bg-base-2 { background-color: #1c2128; }
+    .dark\:bg-base-3 { background-color: #21262d; }
+    .dark\:text-fg { color: #c9d1d9; }
+    .dark\:text-fg-muted { color: #8b949e; }
+    .dark\:text-accent { color: #f59e0b; }
+    .dark\:text-success { color: #10b981; }
+    .dark\:text-error { color: #ef4444; }
+    .dark\:text-link { color: #58a6ff; }
+    .dark\:border-base { border-color: #30363d; }
+    .dark\:bg-card { background-color: #161b22; }
+
+    /* Console terminal */
+    #console-box {
+      background: #0d1117;
+      color: #3fb950;
+      font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace;
+      font-size: 0.85rem;
+      border: 1px solid #21262d;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* Test checklist */
+    .test-item {
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
+      padding-left: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+    .test-item.passed { border-left-color: #10b981; background: rgba(16,185,129,0.08); }
+    .test-item.failed { border-left-color: #ef4444; background: rgba(239,68,68,0.08); }
+    .test-item.pending { border-left-color: #8b949e; background: transparent; }
+
+    /* Progress bar */
+    .progress-bar-outer {
+      height: 6px;
+      background: #21262d;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-bar-inner {
+      height: 100%;
+      background: linear(90deg, #f59e0b, #f97316);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    /* CodeMirror fixes */
+    .CodeMirror {
+      height: auto !important;
+      min-height: 380px;
+      font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace;
+      font-size: 0.9rem;
+    }
+    .CodeMirror-scroll { overflow: visible; }
+
+    @media (max-width: 768px) {
+      .grid-cols-desktop { grid-template-columns: 1fr !important; }
+      .col-span-full { grid-column: 1 / -1 !important; }
+      #editor-container { min-height: 300px; }
+    }
+  </style>
+</head>
+<body class="dark bg-base-0 text-fg font-sans antialiased">
+  <div id="app" class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-base-1 border-b border-base p-4 flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-md bg-accent flex items-center justify-center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-base-0"><path d="M12 2L15 9H22L16 14H7L2 9H9L12 2z"/></svg>
+        </div>
+        <span class="text-xl font-bold text-accent">PyCamp</span>
+        <span class="text-xs text-fg-muted">v1.0</span>
+      </div>
+      <div class="flex items-center gap-2 text-sm">
+        <span id="progress-text" class="text-fg-muted">Урок 1/12 — 8%</span>
+        <div class="progress-bar-outer w-32 hidden sm:block">
+          <div id="progress-bar" class="progress-bar-inner w-0"></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main grid -->
+    <main class="flex-1 overflow-hidden grid grid-cols-desktop">
+
+      <!-- LEFT: Modules + Theory + Task -->
+      <aside id="left-panel" class="w-64 bg-base-1 border-r border-base overflow-y-auto p-4 flex flex-col gap-4">
+        <!-- Modules navigation -->
+        <section>
+          <h2 class="text-xs uppercase tracking-wider text-fg-muted mb-2">Модули</h2>
+          <nav id="modules-nav" class="flex flex-col gap-1"></nav>
+        </section>
+
+        <!-- Theory -->
+        <section id="theory-section" class="flex-1">
+          <h3 class="text-sm font-semibold text-fg mb-2">📖 Теория</h3>
+          <div id="theory-content" class="text-sm text-fg-muted leading-relaxed prose prose-sm dark:prose-invert"></div>
+        </section>
+
+        <!-- Task -->
+        <section id="task-section" class="border-t border-base pt-3">
+          <h3 class="text-sm font-semibold text-fg mb-1">🎯 Задание</h3>
+          <div id="task-content" class="text-sm text-fg-muted space-y-2"></div>
+          <div id="task-goal" class="text-xs text-fg-muted mt-2 italic"></div>
+        </section>
+      </aside>
+
+      <!-- CENTER: Editor + Controls -->
+      <section class="flex flex-col p-4 gap-4 overflow-hidden">
+        <!-- Editor container -->
+        <div id="editor-container" class="flex-1 bg-base-2 rounded-lg border border-base overflow-hidden">
+          <div id="editor"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="btn-run" class="btn-controls" aria-label="Запустить код">
+            <i data-lucide="play" class="w-4 h-4"></i> ▶️ Запустить
+          </button>
+          <button id="btn-check" class="btn-controls" aria-label="Проверить решение">
+            <i data-lucide="check" class="w-4 h-4"></i> ✅ Проверить
+          </button>
+          <button id="btn-reset" class="btn-controls btn-reset" aria-label="Сбросить код">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i> 🔄 Сброс
+          </button>
+          <span id="run-status" class="text-xs text-fg-muted ml-2 hidden sm:inline"></span>
+        </div>
+      </section>
+
+      <!-- RIGHT: Console + Test Checklist -->
+      <aside class="w-80 bg-base-1 border-l border-base overflow-y-auto p-4 flex flex-col gap-4">
+        <!-- Console -->
+        <section>
+          <h3 class="text-sm font-semibold text-fg mb-2">🖥️ Консоль</h3>
+          <div id="console-box" role="log" aria-live="polite" aria-atomic="true"></div>
+          <button id="btn-clear-console" class="mt-2 text-xs text-link hover:underline" aria-label="Очистить консоль">
+            🧹 Очистить
+          </button>
+        </section>
+
+        <!-- Test checklist -->
+        <section id="tests-section" class="flex-1">
+          <h3 class="text-sm font-semibold text-fg mb-2">🧪 Тесты</h3>
+          <div id="tests-checklist" class="space-y-1"></div>
+          <div id="tests-summary" class="text-xs text-fg-muted mt-2 hidden">
+            <span id="tests-passed-count">0</span>/<span id="tests-total-count">0</span> пройдено
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <!-- Mobile: Console at bottom -->
+    <div class="md:hidden bg-base-1 border-t border-base p-3">
+      <h3 class="text-sm font-semibold text-fg mb-1">🖥️ Консоль</h3>
+      <div id="console-box-mobile" role="log" aria-live="polite" style="background:#0d1117;color:#3fb950;font-family:monospace;font-size:0.8rem;padding:0.5rem;border-radius:0.375rem;height:120px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // ═══════════════════════════════════════════════════════════
+      // 1. COURSE DATA — 12 рабочих уроков + 2 каркасных
+      // ═══════════════════════════════════════════════════════════
+      const courseData = [
+        {
+          id: 'm1',
+          title: '🔹 Переменные и типы',
+          icon: 'disc-3',
+          lessons: [
+            {
+              id: 'l1-1',
+              moduleId: 'm1',
+              title: '1. Переменные и числа',
+              theory: `### Переменные\n\nПеременная — это **имя**, ссылающееся на значение.\n\n\`\`\`python\nx = 10          # целое\npi = 3.14       # дробное\nname = "Анна"   # строка\nis_ok = True    # булево\n\`\`\`\n\nВ Python **не нужно** указывать тип — он определяется автоматически.`,
+              initialCode: 'x = 10\n# TODO: присвоить переменной y значение 20\ny = 20\nprint(f"x = {{x}}, y = {{y}}")',
+              tests: [
+                { name: 'x — целое', test: 'assert isinstance(x, int), "x должен быть int"' },
+                { name: 'y == 20', test: 'assert y == 20, "y должно быть 20"' },
+                { name: 'x + y == 30', test: 'assert x + y == 30, "x + y должно быть 30"' },
+              ],
+              hints: ['Используйте оператор = для присваивания', 'print() выводит значения'],
+              goal: 'Создать переменные x=10 и y=20, вывести их сумму',
+            },
+            {
+              id: 'l1-2',
+              moduleId: 'm1',
+              title: '2. Строки и булевы',
+              theory: `### Строки (str)\n\nСтроки — в кавычках (одинарных, двойных или тройных).\n\n\`\`\`python\ngreeting = "Привет"\nmultiline = """Строка\nна несколько\nстрок"""\n\`\`\`\n\n### Булевы (bool)\n\n\`\`\`python\nis_active = True\nis_empty = False\n\`\`\`\n\n### Встроенные методы\n\n\`\`\`python\ntext = "hello"\nprint(text.upper())  # HELLO\nprint(len(text))     # 5\n\`\`\``,
+              initialCode: 'name = "Пётр"\n# TODO: создать приветствие\ngreeting = "Привет, " + name\nprint(greeting)',
+              tests: [
+                { name: 'name — строка', test: 'assert isinstance(name, str)' },
+                { name: 'greeting содержит Пётр', test: 'assert "Пётр" in greeting' },
+                { name: 'greeting длина > 10', test: 'assert len(greeting) > 10' },
+              ],
+              hints: ['Конкатенация: "a" + "b"', 'len() — длина строки'],
+              goal: 'Создать приветствие с именем',
+            },
+            {
+              id: 'l1-3',
+              moduleId: 'm1',
+              title: '3. None и ввод',
+              theory: `### None\n\n\`\`\`python\nresult = None  # "ничего"\nif result is None:\n    print("Пусто")\n\`\`\`\n\n### Ввод с клавиатуры\n\n\`\`\`python\nname = input("Имя: ")  # всегда str\nage = int(input("Возраст: "))\n\`\`\`\n\n⚠️ \`input()\` **всегда** возвращает \`str\` — преобразуйте явно.',
+              initialCode: 'age_str = input("Возраст: ")\n# TODO: преобразовать и вывести\nage = int(age_str)\nprint(f"Тебе {{age}} лет")',
+              tests: [
+                { name: 'age — int', test: 'assert isinstance(age, int)' },
+                { name: 'age > 0', test: 'assert age > 0' },
+              ],
+              hints: ['int() преобразует str → int', 'Проверьте, что ввели число'],
+              goal: 'Считать возраст, преобразовать, вывести',
+            },
+          ],
+        },
+        {
+          id: 'm2',
+          title: '🔹 Условия и циклы',
+          icon: 'git-branch',
+          lessons: [
+            {
+              id: 'l2-1',
+              moduleId: 'm2',
+              title: '1. if / elif / else',
+              theory: `### Условные операторы\n\n\`\`\`python\nage = 18\nif age >= 18:\n    print("Взрослый")\nelif age >= 13:\n    print("Подросток")\nelse:\n    print("Ребёнок")\n\`\`\`\n\nСравнения: \`==\`, \`!=\`, \`>\`, \`<\`, \`>=\`, \`<=\`.\nЛогика: \`and\`, \`or\`, \`not\`.`,
+              initialCode: 'score = 75\n# TODO: выставить оценку\nif score >= 90:\n    grade = "A"\nelif score >= 80:\n    grade = "B"\nelif score >= 70:\n    grade = "C"\nelse:\n    grade = "F"\nprint(f"Оценка: {{grade}}")',
+              tests: [
+                { name: 'grade — строка', test: 'assert isinstance(grade, str)' },
+                { name: 'score=75 → C', test: 'assert grade == "C"' },
+                { name: 'score=92 → A', test: 'assert grade == "A"' },
+              ],
+              hints: ['if/elif/else — порядок важен', 'score >= 90 проверяется первым'],
+              goal: 'Выставить оценку по баллам',
+            },
+            {
+              id: 'l2-2',
+              moduleId: 'm2',
+              title: '2. while',
+              theory: `### while\n\n\`\`\`python\ni = 0\nwhile i < 5:\n    print(i)\n    i += 1\n\`\`\`\n\n⚠️ Осторожно — бесконечный цикл! Условие должно становиться ложным.\n\n### break / continue\n\n\`\`\`python\nwhile True:\n    cmd = input("> ")\n    if cmd == "выход": break\n\`\`\``,
+              initialCode: 'counter = 0\n# TODO: считать до 5 (не включая)\nwhile counter < 5:\n    print(counter)\n    counter += 1',
+              tests: [
+                { name: 'counter == 5', test: 'assert counter == 5' },
+                { name: 'последний print — 4', test: 'assert counter == 5' }, // косвенно
+              ],
+              hints: ['< 5 — значит 0,1,2,3,4', 'не забудь += 1'],
+              goal: 'Вывести числа от 0 до 4',
+            },
+            {
+              id: 'l2-3',
+              moduleId: 'm2',
+              title: '3. for',
+              theory: `### for по range\n\n\`\`\`python\nfor i in range(5):      # 0..4\n    print(i)\n\nfor i in range(2, 6):   # 2..5\n    print(i)\n\nfor i in range(0, 10, 2):  # шаг 2\n    print(i)\n\`\`\`\n\n### for по коллекции\n\n\`\`\`python\ncolors = ["red", "green"]\nfor c in colors:\n    print(c)\n\`\`\``,
+              initialCode: 'numbers = []\n# TODO: заполнить числами 1..5\nfor i in range(1, 6):\n    numbers.append(i)\nprint(numbers)',
+              tests: [
+                { name: 'numbers == [1,2,3,4,5]', test: 'assert numbers == [1,2,3,4,5]' },
+                { name: 'len == 5', test: 'assert len(numbers) == 5' },
+              ],
+              hints: ['range(1,6) — от 1 до 5', 'append добавляет в конец'],
+              goal: 'Заполнить список числами 1..5',
+            },
+          ],
+        },
+        {
+          id: 'm3',
+          title: '🔹 Структуры данных',
+          icon: 'list-tree',
+          lessons: [
+            {
+              id: 'l3-1',
+              moduleId: 'm3',
+              title: '1. Списки (list)',
+              theory: `### Список\n\n\`\`\`python\nfruits = ["apple", "banana", "cherry"]\nprint(fruits[0])      # apple\nprint(fruits[-1])     # cherry\nfruits.append("orange")\n\`\`\`\n\nСрез: \`fruits[1:3]\` — элементы 1 и 2.`,
+              initialCode: 'numbers = [1, 2, 3]\n# TODO: добавить 4 и 5, вывести сумму\nnumbers.append(4)\nnumbers.append(5)\ntotal = sum(numbers)\nprint(total)',
+              tests: [
+                { name: 'numbers == [1,2,3,4,5]', test: 'assert numbers == [1,2,3,4,5]' },
+                { name: 'total == 15', test: 'assert total == 15' },
+              ],
+              hints: ['append() добавляет элемент', 'sum() — сумма элементов'],
+              goal: 'Добавить 4 и 5, посчитать сумму',
+            },
+            {
+              id: 'l3-2',
+              moduleId: 'm3',
+              title: '2. Кортежи и множества',
+              theory: `### Кортеж (tuple)\n\nНеизменяемый: \`t = (1, 2)\`.\n\n### Множество (set)\n\nУникальные элементы, неупорядоченные: \`s = {1, 2, 2, 3}\` → \`{1,2,3}\`.\n\n\`\`\`python\nunique = set([1,1,2,2,3])\nprint(unique)  # {1,2,3}\n\`\`\``,
+              initialCode: 'items = [1, 1, 2, 2, 3, 3]\n# TODO: получить уникальные\nunique_set = set(items)\nprint(sorted(unique_set))',
+              tests: [
+                { name: 'unique_set == {1,2,3}', test: 'assert unique_set == {1,2,3}' },
+                { name: 'len == 3', test: 'assert len(unique_set) == 3' },
+              ],
+              hints: ['set() убирает дубликаты', 'sorted() — сортировка'],
+              goal: 'Убрать дубликаты и вывести',
+            },
+            {
+              id: 'l3-3',
+              moduleId: 'm3',
+              title: '3. Словари (dict)',
+              theory: `### Словарь\n\n\`\`\`python\nperson = {\n    "name": "Анна",\n    "age": 25,\n    "city": "Москва"\n}\nprint(person["name"])  # Анна\nperson["age"] = 26\n\`\`\`\n\nМетод \`.get()\` — безопасное значение по умолчанию: \`person.get("country", "RU")\`.`,
+              initialCode: 'student = {"name": "Иван", "grade": 4}\n# TODO: добавить курс и вывести имя + курс\nstudent["course"] = "Python"\nprint(f"{{student[\"name\"]}} — {{student[\"course\"]}}")',
+              tests: [
+                { name: 'student["course"] == "Python"', test: 'assert student.get("course") == "Python"' },
+                { name: 'name == "Иван"', test: 'assert student["name"] == "Иван"' },
+              ],
+              hints: ['dict[key] = value', 'f-строки для вывода'],
+              goal: 'Добавить курс, вывести имя и курс',
+            },
+          ],
+        },
+        {
+          id: 'm4',
+          title: '🔹 Функции',
+          icon: 'function',
+          lessons: [
+            {
+              id: 'l4-1',
+              moduleId: 'm4',
+              title: '1. Определение функций',
+              theory: `### def\n\n\`\`\`python\ndef greet(name):\n    return f"Привет, {name}!"\n\nresult = greet("Мир")\n\`\`\`\n\n**return** — возвращает значение. Без него функция возвращает \`None\`.`,
+              initialCode: 'def add(a, b):\n    # TODO: вернуть сумму\n    return a + b\n\nresult = add(3, 4)\nprint(result)',
+              tests: [
+                { name: 'add(3,4) == 7', test: 'assert add(3, 4) == 7' },
+                { name: 'add(0,0) == 0', test: 'assert add(0, 0) == 0' },
+              ],
+              hints: ['return a + b', 'def имя(аргументы):'],
+              goal: 'Написать функцию сложения',
+            },
+            {
+              id: 'l4-2',
+              moduleId: 'm4',
+              title: '2. Аргументы и return',
+              theory: `### Значения по умолчанию\n\n\`\`\`python\ndef power(base, exp=2):\n    return base ** exp\n\nprint(power(3))     # 9\nprint(power(2, 5))  # 32\n\`\`\`\n\n### Несколько return\n\n\`\`\`python\ndef sign(x):\n    if x > 0: return 1\n    if x < 0: return -1\n    return 0\n\`\`\``,
+              initialCode: 'def multiply(a, b=1):\n    # TODO: вернуть a * b\n    return a * b\n\nprint(multiply(5))     # 5\nprint(multiply(5, 3))  # 15',
+              tests: [
+                { name: 'multiply(5) == 5', test: 'assert multiply(5) == 5' },
+                { name: 'multiply(5,3) == 15', test: 'assert multiply(5, 3) == 15' },
+              ],
+              hints: ['b=1 — значение по умолчанию', 'умножение: a * b'],
+              goal: 'Функция с параметром по умолчанию',
+            },
+            {
+              id: 'l4-3',
+              moduleId: 'm4',
+              title: '3. Lambda и область видимости',
+              theory: `### Lambda\n\n\`\`\`python\nsquare = lambda x: x ** 2\nprint(square(4))  # 16\n\`\`\`\n\n### Область видимости\n\n\`\`\`python\nx = 10          # global\ndef f():\n    x = 5       # local\n    return x\n\`\`\`\n\n\`global x\` — читать/писать глобальную переменную.`,
+              initialCode: 'x = 100\n# TODO: вернуть x + 10, не меняя глобальный\ndef add_ten():\n    return x + 10\n\nresult = add_ten()\nprint(result, x)',
+              tests: [
+                { name: 'result == 110', test: 'assert result == 110' },
+                { name: 'x == 100 (глобальный не изменён)', test: 'assert x == 100' },
+              ],
+              hints: ['x — глобальная, читаем без global', 'return x + 10'],
+              goal: 'Прочитать глобальную, вернуть новое значение',
+            },
+          ],
+        },
+        // ═══════════════════════════════════════════════════════════
+        // 2. КАРКАСНЫЕ МОДУЛИ (показывают, как масштабировать)
+        // ═══════════════════════════════════════════════════════════
+        {
+          id: 'm5',
+          title: '⏳ Модули и пакеты (каркас)',
+          icon: 'package',
+          lessons: [
+            {
+              id: 'l5-1',
+              moduleId: 'm5',
+              title: '1. import (каркас)',
+              theory: '## Модули\n\n\`\`\`python\nimport math\nprint(math.sqrt(16))\n\`\`\`\n\n🔧 _Этот урок — каркас. Замените содержимое на свои задания._',
+              initialCode: 'import math\n# TODO: добавить задание\nprint("Каркас урока")',
+              tests: [],
+              hints: [],
+              goal: 'Каркас — добавьте своё задание',
+            },
+            {
+              id: 'l5-2',
+              moduleId: 'm5',
+              title: '2. Создание модуля (каркас)',
+              theory: '## Создание модуля\n\nСохраните файл \`utils.py\` и импортируйте:\n\n\`\`\`python\n# utils.py\ndef hello():\n    return "Hi"\n\n# main.py\nfrom utils import hello\n\`\`\`\n\n🔧 _Каркас — замените на реальный проект._',
+              initialCode: '# Каркас модуля\n# TODO: написать функции\npass',
+              tests: [],
+              hints: [],
+              goal: 'Каркас — добавьте свои функции',
+            },
+          ],
+        },
+      ];
+
+      // ═══════════════════════════════════════════════════════════
+      // 2. STATE
+      // ═══════════════════════════════════════════════════════════
+      const state = {
+        currentModuleId: 'm1',
+        currentLessonId: 'l1-1',
+        editorCode: '',
+        progress: {},        // lessonId: { passed: bool, code: string }
+        runHistory: [],
+      };
+
+      // ═══════════════════════════════════════════════════════════
+      // 3. DOM REFERENCES
+      // ═══════════════════════════════════════════════════════════
+      const $ = (sel) => document.querySelector(sel);
+      const $$ = (sel) => document.querySelectorAll(sel);
+
+      const els = {
+        editor: $('#editor'),
+        modulesNav: $('#modules-nav'),
+        theoryContent: $('#theory-content'),
+        taskContent: $('#task-content'),
+        taskGoal: $('#task-goal'),
+        btnRun: $('#btn-run'),
+        btnCheck: $('#btn-check'),
+        btnReset: $('#btn-reset'),
+        runStatus: $('#run-status'),
+        consoleBox: $('#console-box'),
+        consoleBoxMobile: $('#console-box-mobile'),
+        btnClearConsole: $('#btn-clear-console'),
+        testsChecklist: $('#tests-checklist'),
+        testsSummary: $('#tests-summary'),
+        testsPassedCount: $('#tests-passed-count'),
+        testsTotalCount: $('#tests-total-count'),
+        progressText: $('#progress-text'),
+        progressBar: $('#progress-bar'),
+      };
+
+      // ═══════════════════════════════════════════════════════════
+      // 4. PYODIDE MANAGER
+      // ═══════════════════════════════════════════════════════════
+      let pyodideReady = false;
+      let pyodideInstance = null;
+      let consoleBuffer = [];
+
+      const PYODIDE_LOAD_TIMEOUT = 15000;
+      let pyodideTimeout = null;
+
+      function clearConsole() {
+        consoleBuffer = [];
+        els.consoleBox.innerHTML = '';
+        els.consoleBoxMobile.innerHTML = '';
+      }
+
+      function appendConsole(text, isStderr = false) {
+        const prefix = isStderr ? '⚠️ [stderr]' : '>>> ';
+        const line = document.createElement('div');
+        line.textContent = prefix + text;
+        line.style.opacity = isStderr ? '0.8' : '1';
+        els.consoleBox.appendChild(line);
+        els.consoleBoxMobile.appendChild(line.cloneNode(true));
+        els.consoleBox.scrollTop = els.consoleBox.scrollHeight;
+        els.consoleBoxMobile.scrollTop = els.consoleBoxMobile.scrollHeight;
+      }
+
+      async function initPyodide() {
+        try {
+          els.consoleBox.innerHTML = '⏳ Загружаем Python (Pyodide)...';
+          els.consoleBoxMobile.innerHTML = '⏳ Загружаем Python...';
+
+          pyodideTimeout = setTimeout(() => {
+            if (!pyodideReady) {
+              showError('⏱️ Pyodide загружается дольше 15 сек. Проверьте сеть.');
+              clearConsole();
+              appendConsole('Попробуйте ещё раз.');
+            }
+          }, PYODIDE_LOAD_TIMEOUT);
+
+          pyodideInstance = await loadPyodide({
+            indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/',
+          });
+
+          // Пакеты для продвинутых уроков
+          await pyodideInstance.loadPackage(['numpy', 'matplotlib']);
+
+          // Перехват stdout/stderr
+          pyodideInstance.setStdout((text) => appendConsole(text.trim()));
+          pyodideInstance.setStderr((text) => appendConsole(text.trim(), true));
+
+          pyodideReady = true;
+          clearTimeout(pyodideTimeout);
+          pyodideTimeout = null;
+          appendConsole('✅ Python готов!');
+          return pyodideInstance;
+        } catch (err) {
+          clearTimeout(pyodideTimeout);
+          pyodideTimeout = null;
+          pyodideReady = false;
+          showError('❌ Не удалось загрузить Python. ' + (err.message || String(err)));
+          console.error(err);
+          return null;
+        }
+      }
+
+      async function runPythonCode(code) {
+        if (!pyodideReady) {
+          showError('⏳ Python ещё не загружен. Подождите...');
+          return { ok: false, error: 'Pyodide not ready' };
+        }
+        clearConsole();
+        appendConsole('⏳ Выполняем...');
+        try {
+          // Возвращаем последнее выражение (если есть)
+          const result = pyodideInstance.runPython(code);
+          if (result !== undefined && result !== null) {
+            appendConsole(String(result));
+          }
+          return { ok: true, value: result };
+        } catch (err) {
+          const msg = err.message || String(err);
+          appendConsole('❌ ' + msg, true);
+          return { ok: false, error: msg, pyError: err };
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // 5. CODEMIRROR MANAGER
+      // ═══════════════════════════════════════════════════════════
+      let editorInstance = null;
+
+      function initEditor() {
+        if (editorInstance) editorInstance.destroy();
+        editorInstance = CodeMirror(els.editor, {
+          mode: 'python',
+          theme: 'material',
+          lineNumbers: true,
+          indentUnit: 4,
+          tabSize: 4,
+          lineWrapping: true,
+          foldGutter: true,
+          gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+          extraKeys: {
+            'Ctrl-Enter': () => runCode(),
+            'Shift-Enter': () => checkSolution(),
+            'Ctrl-R': () => resetCode(),
+          },
+          autoCloseBrackets: true,
+          matchBrackets: true,
+        });
+
+        // Обновляем состояние при изменении
+        editorInstance.on('change', () => {
+          state.editorCode = editorInstance.getValue();
+          debounceSave();
+        });
+      }
+
+      function setEditorCode(code) {
+        if (editorInstance) {
+          editorInstance.setValue(code || '');
+        }
+      }
+
+      function getEditorCode() {
+        return editorInstance ? editorInstance.getValue() : state.editorCode;
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // 6. TEST RUNNER
+      // ═══════════════════════════════════════════════════════════
+      function buildTestFullCode(userCode, lessonTests) {
+        // Объединяем код пользователя + тесты
+        const testLines = lessonTests.map(t => t.test).join('\n');
+        return userCode + '\n' + testLines;
+      }
+
+      function parseAssertionError(errorMsg) {
+        if (!errorMsg) return 'Тест не пройден';
+        const match = errorMsg.match(/AssertionError:\s*(.*)/);
+        if (match) return match[1].trim();
+        // Иногда Pyodide выдаёт: "AssertionError: ..."
+        const match2 = errorMsg.match(/AssertionError\s*$(.*)$/);
+        if (match2) return match2[1].trim();
+        return errorMsg.replace(/^AssertionError:?\s*/, '').trim() || 'Тест не пройден';
+      }
+
+      async function runTests(lesson) {
+        const userCode = getEditorCode();
+        const fullCode = buildTestFullCode(userCode, lesson.tests);
+        const result = await runPythonCode(fullCode);
+
+        if (result.ok) {
+          // Все тесты прошли
+          markAllTestsPassed();
+          return { passed: true, details: 'Все тесты пройдены ✅' };
+        } else {
+          // Ошибка — парсим, какой тест упал
+          const errorMsg = result.error || '';
+          const failedTestIndex = findFailedTestIndex(errorMsg, lesson.tests);
+          markTests(failedTestIndex);
+          return { passed: false, failedIndex: failedTestIndex, details: parseAssertionError(errorMsg) };
+        }
+      }
+
+      function findFailedTestIndex(errorMsg, tests) {
+        if (!errorMsg) return 0;
+        // Ищем номер теста в сообщении (если есть)
+        const match = errorMsg.match(/line\s+(\d+)/);
+        if (match) {
+          const line = parseInt(match[1], 10);
+          for (let i = 0; i < tests.length; i++) {
+            if (tests[i].test.includes('line')) return i;
+          }
+        }
+        // По умолчанию — первый
+        return 0;
+      }
+
+      function markAllTestsPassed() {
+        const items = $$('#tests-checklist .test-item');
+        items.forEach(item => {
+          item.classList.add('passed');
+          item.classList.remove('failed', 'pending');
+          item.querySelector('.test-status')?.remove();
+          const status = document.createElement('span');
+          status.className = 'test-status text-success text-xs';
+          status.textContent = ' ✅';
+          item.appendChild(status);
+        });
+        updateTestSummary(true);
+      }
+
+      function markTests(failedIndex) {
+        const items = $$('#tests-checklist .test-item');
+        items.forEach((item, idx) => {
+          item.classList.remove('passed', 'failed', 'pending');
+          item.querySelector('.test-status')?.remove();
+          if (idx <= failedIndex) {
+            item.classList.add('failed');
+            const status = document.createElement('span');
+            status.className = 'test-status text-xs text-error';
+            status.textContent = ' ❌';
+            item.appendChild(status);
+          } else {
+            item.classList.add('pending');
+            const status = document.createElement('span');
+            status.className = 'test-status text-xs text-fg-muted';
+            status.textContent = ' ⏳';
+            item.appendChild(status);
+          }
+        });
+        updateTestSummary(false);
+      }
+
+      function updateTestSummary(allPassed) {
+        const total = els.testsTotalCount.textContent;
+        const passed = allPassed ? total : Array.from($$('#tests-checklist .test-item.passed')).length;
+        els.testsPassedCount.textContent = passed;
+        els.testsTotalCount.textContent = total;
+        if (allPassed) {
+          els.testsSummary.classList.remove('hidden');
+          els.testsSummary.style.color = '#10b981';
+        } else if (passed > 0) {
+          els.testsSummary.classList.remove('hidden');
+          els.testsSummary.style.color = '#f59e0b';
+        } else {
+          els.testsSummary.classList.add('hidden');
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // 7. RENDERERS
+      // ═══════════════════════════════════════════════════════════
+      function renderModulesNav() {
+        els.modulesNav.innerHTML = '';
+        courseData.forEach(mod => {
+          const isActive = mod.id === state.currentModuleId;
+          const icon = lucide.icons[mod.icon] || lucide.icons.disc3;
+          const moduleHTML = `
+            <button class="module-btn w-full text-left px-3 py-2 rounded-md transition-all ${isActive ? 'bg-accent text-base-0' : 'text-fg-muted hover:bg-base-2'}"
+                    data-module="${mod.id}" style="justify-content: flex-start;">
+              <span class="inline-flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  ${icon}
+                </svg>
+                <span class="font-medium">${mod.title}</span>
+              </span>
+              <span class="ml-auto text-xs ${isActive ? 'text-base-0' : 'text-fg-muted'}">${getModuleProgress(mod)}</span>
+            </button>
+          `;
+          els.modulesNav.insertAdjacentHTML('beforeend', moduleHTML);
+        });
+
+        $$('.module-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const moduleId = btn.dataset.module;
+            if (moduleId !== state.currentModuleId) {
+              const mod = courseData.find(m => m.id === moduleId);
+              if (mod && mod.lessons.length > 0) {
+                state.currentModuleId = moduleId;
+                state.currentLessonId = mod.lessons[0].id;
+                loadLesson(state.currentLessonId);
+                renderModulesNav();
+              }
+            }
+          });
+        });
+      }
+
+      function getModuleProgress(mod) {
+        const lessons = mod.lessons;
+        const passed = lessons.filter(l => state.progress[l.id]?.passed).length;
+        return `${passed}/${lessons.length}`;
+      }
+
+      function renderTheoryAndTask(lesson) {
+        // Theory (простая markdown-рендеринг)
+        let theoryHtml = lesson.theory
+          .replace(/### (.+)/g, '<strong class="text-fg text-lg">$1</strong>')
+          .replace(/`\`\`python\n([\s\S]*?)\n\`\`\`/g, '<pre class="bg-base-2 p-2 rounded text-xs overflow-x-auto"><code class="text-fg">$1</code></pre>')
+          .replace(/`([^`]+)`/g, '<code class="bg-base-2 px-1 rounded">$1</code>')
+          .replace(/\n/g, '<br>');
+        els.theoryContent.innerHTML = theoryHtml;
+
+        // Task
+        els.taskContent.innerHTML = lesson.theory.replace(/### (.+)/g, '').split('\n\n')[0] || lesson.title;
+        els.taskGoal.textContent = lesson.goal || 'Выполните задание';
+
+        // Tests checklist
+        renderTestsChecklist(lesson);
+      }
+
+      function renderTestsChecklist(lesson) {
+        els.testsChecklist.innerHTML = '';
+        els.testsTotalCount.textContent = lesson.tests.length;
+        if (lesson.tests.length === 0) {
+          els.testsChecklist.innerHTML = '<p class="text-fg-muted text-sm">Нет тестов (каркасный урок).</p>';
+          els.testsSummary.classList.add('hidden');
+          return;
+        }
+        lesson.tests.forEach((test, idx) => {
+          const passed = state.progress[lesson.id]?.passed === true;
+          const statusClass = passed ? 'passed' : 'pending';
+          const item = document.createElement('div');
+          item.className = `test-item ${statusClass}`;
+          item.innerHTML = `
+            <span class="test-index text-xs text-fg-muted">${idx + 1}.</span>
+            <span class="test-name text-sm">${test.name}</span>
+          `;
+          els.testsChecklist.appendChild(item);
+        });
+        updateTestSummary(false);
+      }
+
+      function updateProgressUI() {
+        const lesson = getCurrentLesson();
+        if (!lesson) return;
+        const totalLessons = courseData.reduce((sum, m) => sum + m.lessons.length, 0);
+        const passedLessons = Object.values(state.progress).filter(p => p?.passed).length;
+        const pct = Math.round((passedLessons / totalLessons) * 100);
+        els.progressText.textContent = `Урок ${passedLessons}/${totalLessons} — ${pct}%`;
+        els.progressBar.style.width = pct + '%';
+      }
+
+      function getCurrentLesson() {
+        const mod = courseData.find(m => m.id === state.currentModuleId);
+        if (!mod) return null;
+        return mod.lessons.find(l => l.id === state.currentLessonId) || mod.lessons[0];
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // 8. LOCALSTORAGE
+      // ═══════════════════════════════════════════════════════════
+      const STORAGE_KEY = 'pypcamp-progress-v1';
+      const SAVE_DEBOUNCE = 500;
+      let saveTimeout = null;
+
+      function debounceSave() {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(saveProgress, SAVE_DEBOUNCE);
+      }
+
+      function saveProgress() {
+        try {
+          const data = {
+            currentModuleId: state.currentModuleId,
+            currentLessonId: state.currentLessonId,
+            editorCode: getEditorCode(),
+            progress: state.progress,
+            runHistory: state.runHistory.slice(0, 50),
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+          // localStorage full — игнорируем
+        }
+      }
+
+      function loadProgress() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return null;
+          const data = JSON.parse(raw);
+          // Миграция / валидация
+          if (typeof data.currentModuleId !== 'string') return null;
+          return data;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function applyLoadedProgress(data) {
+        state.currentModuleId = data.currentModuleId;
+        state.currentLesson
