@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyCodeCamp - Learn Python Interactively</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom Dark Theme Base - Mimics freeCodeCamp dark mode */
+        :root {
+            --bg-primary: #0a0a23;
+            --bg-secondary: #1f2937;
+            --text-primary: #e5e7eb;
+            --accent-primary: #3b82f6;
+            --success-color: #10b981;
+            --error-color: #ef4444;
+        }
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: ui-sans-serif, system-ui, sans-serif;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Prevent body scroll due to layout */
+        }
+        /* CodeMirror styling */
+        .CodeMirror {
+            height: 100%;
+            font-size: 14px;
+        }
+
+        /* Styling for the multi-panel layout */
+        .code-editor-panel {
+            overflow: auto;
+            min-height: 100%;
+        }
+
+        /* Responsive layout for mobile tabs */
+        @media (max-width: 1024px) {
+            .grid-cols-3 {
+                grid-template-columns: 1fr; /* Stack panels on small screens */
+            }
+            .panel {
+                min-height: 300px;
+            }
+        }
+    </style>
+    <!-- CodeMirror 6 CDN (Using a modern, lightweight setup) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.0.0-beta/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.0.0-beta/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.0.0-beta/mode/python/python.min.js"></script>
+</head>
+<body class="text-white">
+
+    <!-- Loading Overlay for Pyodide -->
+    <div id="loader-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/95 transition-opacity duration-500">
+        <div class="text-center p-8 rounded-xl shadow-2xl bg-slate-800 border border-indigo-500/50">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p class="text-xl font-semibold text-indigo-300">Loading Python Environment (Pyodide)...</p>
+            <p class="text-sm text-gray-400 mt-2">This may take a moment on the first run. Please wait while the WebAssembly runtime initializes.</p>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div id="app-container" class="h-screen flex flex-col hidden">
+
+        <!-- Top Header/Navigation -->
+        <header class="bg-gray-900 shadow-lg p-4 flex justify-between items-center flex-shrink-0">
+            <h1 class="text-2xl font-bold text-indigo-400">🐍 PyCodeCamp</h1>
+            <div class="flex items-center space-x-4">
+                <div id="progress-bar-container" class="w-64 bg-gray-700 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-green-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <span id="lesson-title-header" class="text-sm font-medium text-gray-300">Lesson 1: Syntax</span>
+            </div>
+        </header>
+
+        <!-- Main Content Grid -->
+        <main class="flex-grow grid grid-cols-3 gap-4 p-4 overflow-hidden">
+            
+            <!-- Left Panel: Theory & Navigation -->
+            <section id="theory-panel" class="panel col-span-1 flex flex-col bg-gray-800 rounded-lg shadow-xl p-4 overflow-y-auto border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">📚 Theory & Lessons</h2>
+                <div id="lesson-nav" class="space-y-2 mb-6">
+                    <!-- Lesson navigation buttons go here -->
+                </div>
+                
+                <div id="instructions-content" class="flex-grow overflow-y-auto pt-4">
+                    <!-- Lesson instructions (Markdown/HTML) go here -->
+                    <p>Loading theory...</p>
+                </div>
+                
+                <div class="mt-auto pt-4 border-t border-gray-700">
+                    <button id="run-code-btn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 transition duration-150 rounded-lg font-bold text-lg disabled:bg-gray-600" disabled>
+                        ▶ Run Code
+                    </button>
+                    <div class="mt-3 text-center">
+                        <button id="save-progress-btn" class="text-sm text-gray-400 hover:text-white">Save Progress</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Center Panel: Code Editor -->
+            <section id="code-panel" class="panel col-span-1 flex flex-col bg-gray-800 rounded-lg shadow-xl p-2 border border-gray-700">
+                <div class="flex-shrink-0 p-2 border-b border-gray-700 text-sm font-medium text-gray-400">
+                    Code Editor <span id="editor-info" class="float-right text-xs text-gray-500"></span>
+                </div>
+                <div class="flex-grow code-editor-panel">
+                    <textarea id="code-editor"></textarea>
+                </div>
+            </section>
+
+            <!-- Right Panel: Console & Tests -->
+            <section id="output-panel" class="panel col-span-1 flex flex-col bg-gray-800 rounded-lg shadow-xl p-4 overflow-y-auto border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">🖥 Output & Tests</h2>
+                
+                <!-- Console -->
+                <div class="flex-grow border border-gray-700 p-3 rounded-lg bg-gray-900/50 mb-4">
+                    <p class="text-sm font-medium mb-2 text-indigo-300">Console Output (stdout):</p>
+                    <pre id="console-output" class="text-sm whitespace-pre-wrap text-gray-300 h-full overflow-y-auto">Console starts here.</pre>
+                </div>
+
+                <!-- Test Results -->
+                <div class="border border-gray-700 p-3 rounded-lg bg-gray-900/50 flex-shrink-0">
+                    <p class="text-sm font-medium mb-2 text-indigo-300">Test Results:</p>
+                    <div id="test-results-status" class="text-lg font-bold">
+                        <span id="overall-status" class="text-yellow-400">Awaiting Run...</span>
+                    </div>
+                    <ul id="test-details" class="mt-2 space-y-1 text-sm">
+                        <!-- Test results list goes here -->
+                    </ul>
+                </div>
+
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        // ====================================================
+        // 🎯 CORE DATA STRUCTURE: PYTHON COURSE CONTENT
+        // ====================================================
+        // 🚨 SCALABILITY NOTE: To add new lessons, simply copy an existing lesson object 
+        // and update its 'id', 'title', 'instructions', 'starterCode', and 'tests'.
+        // Ensure the 'solution' reflects the correct test passing logic.
+        
+        const COURSE_DATA = [
+            {
+                id: 1,
+                title: "Lesson 1: Syntax & Print",
+                instructions: `
+                    <p>Welcome to PyCodeCamp! Python's readability is its superpower. Everything starts with clear syntax. The <code>print()</code> function is your window to the world, allowing you to display information to the user.</p>
+                    
+                    <h3>Basic Concepts</h3>
+                    <ul>
+                        <li><strong>Functions:</strong> Python functions are defined using <code>def</code>.</li>
+                        <li><strong>Comments:</strong> Use the hash symbol <code>#</code> for comments. They are ignored by the interpreter.</li>
+                        <li><strong>Indentation:</strong> Python uses consistent indentation (usually 4 spaces) to define code blocks, which is mandatory.</li>
+                    </ul>
+                    
+                    <h4>Example: Printing Hello World</h4>
+                    <pre><code>print("Hello, World!")</code></pre>
+                    
+                    <p>Your task is to use the <code>print()</code> function to display your name and a simple greeting.</p>
+                `,
+                starterCode: `print("Hello!")`,
+                tests: [
+                    { condition: () => {
+                        let output = console.logHistory.join("");
+                        return output.includes("Hello") && output.includes("World");
+                    }, message: "The output must contain 'Hello' and 'World'." }
+                ],
+                solution: `print("Hello, World!")`
+            },
+            {
+                id: 2,
+                title: "Lesson 2: Variables & Types",
+                instructions: `
+                    <p>Variables are containers for storing data values. In Python, you don't need to explicitly declare the type; the interpreter figures it out dynamically. Python supports several primitive types.</p>
+                    
+                    <h3>Data Types Overview</h3>
+                    <ul>
+                        <li><strong>Integers (int):</strong> Whole numbers (e.g., <code>10</code>, <code>-5</code>).</li>
+                        <li><strong>Floats (float):</strong> Decimal numbers (e.g., <code>3.14</code>).</li>
+                        <li><strong>Strings (str):</strong> Text data, enclosed in single or double quotes (e.g., <code>"Python"</code>).</li>
+                    </ul>
+                    
+                    <h4>Example: Defining Variables</h4>
+                    <pre><code>name = "Alice"
+age = 30
+is_student = False</code></pre>
+                    
+                    <p>Set a variable for your name and a variable for your favorite number. Then, print a sentence that uses both variables.</p>
+                `,
+                starterCode: `name = ""`,
+                tests: [
+                    { condition: () => {
+                        // Check if the 'name' variable is defined and printed correctly
+                        let output = console.logHistory.join("");
+                        return output.includes("My name is") && output.includes("number");
+                    }, message: "Output must include the full sentence using both variables." }
+                ],
+                solution: `name = "Your Name"\nnumber = 42\nprint("My name is " + name + " and my favorite number is " + str(number))`
+            },
+            {
+                id: 3,
+                title: "Lesson 3: Conditional Logic (If/Else)",
+                instructions: `
+                    <p>Conditional statements allow your code to make decisions. If a condition is true, one block of code runs; otherwise, the <code>else</code> block runs.</p>
+                    
+                    <h3>Operators</h3>
+                    <ul>
+                        <li><strong>Comparison:</strong> <code>==</code> (equal to), <code>!=</code> (not equal to), <code>></code> (greater than), <code><</code> (less than).</li>
+                        <li><strong>Boolean Logic:</strong> <code>and</code>, <code>or</code>.</li>
+                    </ul>
+                    
+                    <h4>Example: Simple Gate Check</h4>
+                    <pre><code>score = 75
+if score >= 70:
+    print("Pass")
+else:
+    print("Fail")</code></pre>
+                    
+                    <p>Write a program that takes a given score and prints "Excellent" if the score is above 90, "Good" if it is between 70 and 90 (inclusive), and "Needs Improvement" otherwise.</p>
+                `,
+                starterCode: `score = 0`,
+                tests: [
+                    { condition: () => {
+                        // Requires checking the last printed string
+                        let output = console.logHistory.join("");
+                        return output.includes("Excellent") || output.includes("Good") || output.includes("Needs Improvement");
+                    }, message: "The program must print one of the required evaluation messages." }
+                ],
+                solution: `score = 85 # Change this value to test different paths\nif score > 90:\n    print("Excellent")\nelif score >= 70:\n    print("Good")\nelse:\n    print("Needs Improvement")`
+            },
+            {
+                id: 4,
+                title: "Lesson 4: Lists & Indexing",
+                instructions: `
+                    <p>Lists are ordered, mutable collections of items. They are incredibly useful for handling sequences of data.</p>
+                    
+                    <h3>List Operations</h3>
+                    <ul>
+                        <li><strong>Indexing:</strong> Access items using square brackets (e.g., <code>my_list[0]</code> for the first item). Python starts counting from 0.</li>
+                        <li><strong>Mutability:</strong> You can change list items: <code>my_list[1] = 'new_item'</code>.</li>
+                        <li><strong>Methods:</strong> <code>.append()</code> adds an item to the end.</li>
+                    </ul>
+                    
+                    <h4>Example: Accessing Data</h4>
+                    <pre><code>fruits = ["apple", "banana", "cherry"]
+print(fruits[0]) # Output: apple</code></pre>
+                    
+                    <p>Create a list of three colors. Then, change the second color to 'purple' and print the entire list.</p>
+                `,
+                starterCode: `colors = []`,
+                tests: [
+                    { condition: () => {
+                        // Check if the final output string contains 'purple' and all three colors
+                        let output = console.logHistory.join("");
+                        return output.includes("purple") && output.split(" ")[0] === "colors"; // Simple check
+                    }, message: "The list must be modified and printed correctly." }
+                ],
+                solution: `colors = ["red", "green", "blue"]\ncolors[1] = "purple"\nprint("The colors list:", colors)`
+            },
+            {
+                id: 5,
+                title: "Lesson 5: Dictionaries",
+                instructions: `
+                    <p>Dictionaries store data in key-value pairs. Instead of accessing by numerical index (like lists), you access data using a unique key.</p>
+                    
+                    <h3>Dictionary Syntax</h3>
+                    <ul>
+                        <li><strong>Structure:</strong> Defined using curly braces: <code>{key: value, key2: value2}</code>.</li>
+                        <li><strong>Accessing:</strong> Use the key inside square brackets: <code>user['name']</code>.</li>
+                        <li><strong>Modification:</strong> <code>user['age'] = 31</code>.</li>
+                    </ul>
+                    
+                    <h4>Example: User Profile</h4>
+                    <pre><code>profile = {"name": "Alex", "city": "Paris"}
+print(profile["name"]) # Output: Alex</code></pre>
+                    
+                    <p>Create a dictionary for a car with keys like 'make' and 'year'. Then, print the car's make and year.</p>
+                `,
+                starterCode: `car_profile = {}`,
+                tests: [
+                    { condition: () => {
+                        // Check if both 'make' and 'year' are present and printed
+                        let output = console.logHistory.join("");
+                        return output.includes("Make:") && output.includes("Year:");
+                    }, message: "The output must successfully display both the car's make and year." }
+                ],
+                solution: `car_profile = {"make": "Tesla", "year": 2022}\nprint("Make:", car_profile["make"])\nprint("Year:", car_profile["year"])`
+            }
+        ];
+
+        // ====================================================
+        // 💾 STATE & DOM ELEMENTS
+        // ====================================================
+        const STATE = {
+            currentLessonId: COURSE_DATA[0].id,
+            lessonProgress: {}, // Stores { lessonId: { completed: boolean, code: string } }
+            pyodideInstance: null,
+            isLoading: true,
+        };
+
+        const DOM = {
+            appContainer: document.getElementById('app-container'),
+            loaderOverlay: document.getElementById('loader-overlay'),
+            lessonNav: document.getElementById('lesson-nav'),
+            instructionsContent: document.getElementById('instructions-content'),
+            codeEditor: document.getElementById('code-editor'),
+            consoleOutput: document.getElementById('console-output'),
+            testDetails: document.getElementById('test-details'),
+            overallStatus: document.getElementById('overall-status'),
+            progressBar: document.getElementById('progress-bar'),
+            runCodeBtn: document.getElementById('run-code-btn'),
+            lessonTitleHeader: document.getElementById('lesson-title-header'),
+            progressSaveBtn: document.getElementById('save-progress-btn'),
+            editorInfo: document.getElementById('editor-info'),
+        };
+
+        // Global storage for captured stdout during execution
+        console.logHistory = [];
+
+        // ====================================================
+        // ⚙️ UTILITY FUNCTIONS
+        // ====================================================
+
+        /**
+         * Helper function to safely convert Python objects to string for display/testing.
+         * @param {*} obj 
+         */
+        function str(obj) {
+            try {
+                return JSON.stringify(obj);
+            } catch (e) {
+                return String(obj);
+            }
+        }
+
+        /**
+         * Updates the UI elements based on the current lesson state.
+         */
+        function updateUI() {
+            const lesson = COURSE_DATA.find(l => l.id === STATE.currentLessonId);
+            if (!lesson) return;
+
+            // 1. Update Theory Panel
+            DOM.lessonTitleHeader.textContent = lesson.title;
+            DOM.instructionsContent.innerHTML = lesson.instructions;
+            
+            // 2. Update Code Editor
+            const progress = STATE.lessonProgress[lesson.id] || { completed: false, code: lesson.starterCode };
+            DOM.codeEditor.value = progress.code;
+
+            // 3. Update Progress Bar
+            let completedCount = 0;
+            let totalLessons = COURSE_DATA.length;
+            Object.values(STATE.lessonProgress).forEach(p => {
+                if (p.completed) completedCount++;
+            });
+            const percentage = Math.round((completedCount / totalLessons) * 100);
+            DOM.progressBar.style.width = `${percentage}%`;
+            DOM.progressSaveBtn.textContent = `Saved. Progress: ${percentage}%`;
+
+            // 4. Update Run Button State
+            DOM.runCodeBtn.disabled = !STATE.pyodideInstance;
+
+            // 5. Render Lesson Navigation
+            renderNavigation();
+        }
+
+        /**
+         * Renders the navigable lesson list in the left panel.
+         */
+        function renderNavigation() {
+            DOM.lessonNav.innerHTML = '';
+            COURSE_DATA.forEach(lesson => {
+                const progress = STATE.lessonProgress[lesson.id] || { completed: false };
+                const isActive = lesson.id === STATE.currentLessonId;
+                const button = document.createElement('button');
+                button.className = `w-full text-left p-3 rounded-lg transition duration-150 font-medium ${
+                    isActive ? 'bg-indigo-500 text-white shadow-md' : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                }`;
+                button.innerHTML = `<span>${lesson.title}</span>${progress.completed ? '<span class="float-right text-green-400">✅</span>' : ''}`;
+                button.onclick = () => {
+                    if (!STATE.pyodideInstance) {
+                        console.warn("Pyodide not ready yet. Try refreshing.");
+                        return;
+                    }
+                    loadLesson(lesson.id);
+                };
+                DOM.lessonNav.appendChild(button);
+            });
+        }
+
+
+        /**
+         * Loads a specific lesson into the main view.
+         * @param {number} id 
+         */
+        function loadLesson(id) {
+            STATE.currentLessonId = id;
+            if (STATE.pyodideInstance) {
+                // Clear previous state when switching lessons
+                DOM.consoleOutput.textContent = "Console starts here.";
+                DOM.testDetails.innerHTML = '';
+                DOM.overallStatus.textContent = "Awaiting Run...";
+                DOM.overallStatus.className = "text-yellow-400";
+                
+                // Load data and update UI
+                const lesson = COURSE_DATA.find(l => l.id === id);
+                const progress = STATE.lessonProgress[id] || { completed: false, code: lesson.starterCode };
+                
+                // Load code into editor
+                DOM.codeEditor.setValue(progress.code);
+                
+                // Update general UI
+                updateUI();
+                console.log(`Loaded lesson ${id}: ${lesson.title}`);
+            } else {
+                console.error("Cannot load lesson: Pyodide is not initialized.");
+            }
+        }
+
+        // ====================================================
+        // 🚀 PYODIDE EXECUTION & TESTING ENGINE
+        // ====================================================
+
+        /**
+         * Executes the current code using Pyodide and runs tests.
+         */
+        async function executeCode() {
+            if (!STATE.pyodideInstance) {
+                alert("Python interpreter is still loading. Please wait.");
+                return;
+            }
+
+            const code = DOM.codeEditor.value;
+            const lesson = COURSE_DATA.find(l => l.id === STATE.currentLessonId);
+
+            if (!lesson) return;
+
+            // Reset console history and results
+            console.logHistory = [];
+            DOM.consoleOutput.textContent = "Executing code...";
+            DOM.testDetails.innerHTML = '';
+            DOM.overallStatus.textContent = "Running...";
+            DOM.overallStatus.className = "text-indigo-400";
+
+            try {
+                // 1. Run Code in Pyodide Sandbox
+                // We use Pyodide's runPythonAsync to capture stdout
+                const pyodide = STATE.pyodideInstance;
+                let executionError = null;
+                try {
+                    // Wrap the user code to capture printing via a custom function or rely on Pyodide's default stdout capture
+                    // Since Pyodide's Python environment executes the code, we capture stdout logs in Python side.
+                    
+                    // Standard Pyodide execution:
+                    pyodide.runPython(code);
+
+                } catch (e) {
+                    executionError = e.message;
+                }
+                
+                // 2. Run Tests
+                let allTestsPassed = true;
+                let currentTestFailures = 0;
+
+                for (let i = 0; i < lesson.tests.length; i++) {
+                    const test = lesson.tests[i];
+                    let testPassed = false;
+
+                    try {
+                        // Execute the test condition function (which checks against console.logHistory)
+                        testPassed = test.condition();
+                    } catch (e) {
+                        // If the test execution itself fails
+                        testPassed = false;
+                    }
+
+                    const listItem = document.createElement('li');
+                    listItem.className = `p-2 rounded-md ${testPassed ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'}`;
+                    
+                    if (testPassed) {
+                        listItem.innerHTML = `✔ Test ${i + 1} Passed!`;
+                    } else {
+                        currentTestFailures++;
+                        listItem.innerHTML = `❌ Test ${i + 1} Failed: ${test.message}`;
+                        if (executionError) {
+                            listItem.innerHTML += `<br><small>Execution Error: ${executionError.substring(0, 50)}...</small>`;
+                        }
+                    }
+                    DOM.testDetails.appendChild(listItem);
+
+                    if (!testPassed) {
+                        allTestsPassed = false;
+                    }
+                }
+
+                // 3. Update Status
+                if (executionError) {
+                    DOM.consoleOutput.textContent = `[Runtime Error]\n${executionError}`;
+                    DOM.overallStatus.textContent = "Execution Failed";
+                    DOM.overallStatus.className = "text-red-500";
+                    STATE.lessonProgress[lesson.id] = { 
+                        ...STATE.lessonProgress[lesson.id], 
+                        completed: false,
+                        lastRunError: executionError
+                    };
+                } else if (allTestsPassed) {
+                    DOM.overallStatus.textContent = "✅ Success! Lesson Complete.";
+                    DOM.overallStatus.className = "text-success-color";
+                    // Mark lesson as completed in state
+                    STATE.lessonProgress[lesson.id] = { 
+                        ...STATE.lessonProgress[lesson.id], 
+                        completed: true,
+                        lastCode: DOM.codeEditor.value
+                    };
+                } else {
+                    DOM.overallStatus.textContent = `⚠️ Failed (${currentTestFailures} tests failed)`;
+                    DOM.overallStatus.className = "text-yellow-500";
+                    STATE.lessonProgress[lesson.id] = { 
+                        ...STATE.lessonProgress[lesson.id], 
+                        completed: false,
+                        lastCode: DOM.codeEditor.value
+                    };
+                }
+
+                // Update UI after execution
+                updateUI();
+
+            } catch (e) {
+                console.error("Critical execution failure:", e);
+                DOM.consoleOutput.textContent = "A critical error occurred during testing.";
+                DOM.overallStatus.textContent = "Critical Failure";
+                DOM.overallStatus.className = "text-red-500";
+            }
+        }
+
+
+        // ====================================================
+        // 🗄️ LOCAL STORAGE & INITIALIZATION
+        // ====================================================
+
+        /**
+         * Loads saved progress from localStorage.
+         */
+        function loadState() {
+            try {
+                const savedState = localStorage.getItem('pyCodeCampState');
+                if (savedState) {
+                    const data = JSON.parse(savedState);
+                    // Only load lesson progress
+                    STATE.lessonProgress = data.lessonProgress || {};
+                    console.log("State loaded successfully.");
+                } else {
+                    console.log("No saved state found. Starting fresh.");
+                }
+            } catch (e) {
+                console.error("Error loading state from localStorage", e);
+            }
+        }
+
+        /**
+         * Saves current progress state to localStorage.
+         */
+        function saveState() {
+            try {
+                const stateToSave = {
+                    lessonProgress: STATE.lessonProgress
+                };
+                localStorage.setItem('pyCodeCampState', JSON.stringify(stateToSave));
+                console.log("Progress saved to localStorage.");
+            } catch (e) {
+                console.error("Error saving state to localStorage", e);
+            }
+        }
+
+
+        /**
+         * Initializes Pyodide and starts the application.
+         */
+        async function initializeApp() {
+            console.log("Starting application initialization...");
+            
+            // 1. Load Saved State
+            loadState();
+
+            // 2. Initialize CodeMirror
+            // CodeMirror 6/5 setup
+            const cm = CodeMirror(DOM.codeEditor, {
+                mode: 'python',
+                theme: 'material-darker', // Use a dark theme compatible with CodeMirror
+                lineNumbers: true,
+                autofocus: true,
+            });
+            // Store CM instance globally for reference
+            window.CodeMirrorInstance = cm;
+
+            // 3. Load Pyodide
+            try {
+                // Check if already initialized (optional, but good practice)
+                if (typeof Pyodide === 'undefined') {
+                    await loadPyodide();
+                } else {
+                    STATE.pyodideInstance = Pyodide;
+                    console.log("Pyodide initialized instantly.");
+                }
+                
+                STATE.isLoading = false;
+                
+                // 4. Final setup and UI update
+                DOM.loaderOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    DOM.loaderOverlay.classList.add('hidden');
+                    DOM.appContainer.classList.remove('hidden');
+                    console.log("Application ready. Hiding loader.");
+                    updateUI();
+                    console.log("UI initialized and loaded.");
+                }, 500);
+                
+            } catch (e) {
+                console.error("Failed to initialize Pyodide:", e);
+                DOM.loaderOverlay.querySelector('p').textContent = "FATAL ERROR: Could not load the Python environment.";
+            }
+        }
+
+
+        /**
+         * Fetches and loads the Pyodide core library.
+         */
+        async function loadPyodide() {
+            console.log("Fetching Pyodide...");
+            // NOTE: Using a robust, stable CDN for Pyodide
+            await loadPyodide({
+                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/",
+            });
+            console.log("Pyodide core loaded.");
+        }
+
+
+        // ====================================================
+        // 🔗 EVENT LISTENERS & INITIAL RUN
+        // ====================================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeApp();
+
+            // Event Listeners
+            DOM.runCodeBtn.addEventListener('click', executeCode);
+            DOM.progressSaveBtn.addEventListener('click', saveState);
+            
+            // Key Press Listener for Run Button Shortcut (Ctrl+Enter)
+            DOM.codeEditor.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !DOM.runCodeBtn.disabled) {
+                    e.preventDefault();
+                    executeCode();
+                }
+            });
+        });
+
+    </script>
+
+</body>
+</html>

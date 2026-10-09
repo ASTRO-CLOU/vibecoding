@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PythonLearn - Интерактивное изучение Python</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <!-- CodeMirror 5 CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/python-hint.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+    
+    <!-- Pyodide CDN -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide.js"></script>
+    
+    <!-- marked.js для Markdown рендеринга -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        /* Базовые стили для темной темы */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+        
+        /* Стилизация CodeMirror */
+        .CodeMirror {
+            height: 100%;
+            font-size: 14px;
+            border-radius: 0.5rem;
+        }
+        
+        .CodeMirror-scroll {
+            background-color: #1e1e1e;
+        }
+        
+        /* Стили для тестов */
+        .test-result {
+            transition: all 0.3s ease;
+        }
+        
+        .test-pass {
+            background-color: rgba(34, 197, 94, 0.2);
+            border-color: #22c55e;
+        }
+        
+        .test-fail {
+            background-color: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+        }
+        
+        /* Анимация лоадера */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Стили для панели прогресса */
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        
+        /* Стили для панели тестов */
+        .test-panel {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        /* Стили для мобильной версии */
+        @media (max-width: 768px) {
+            .mobile-tabs {
+                display: flex !important;
+            }
+        }
+        
+        /* Пользовательский скроллбар */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #374151;
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #6b7280;
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <h1 class="text-2xl font-bold text-blue-400">🐍 PythonLearn</h1>
+                <div class="hidden md:block bg-slate-700 px-3 py-1 rounded-full text-xs text-slate-300">
+                    Интерактивные уроки Python в браузере
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
+                    <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span class="text-xs text-slate-400">Прогресс: <span id="progress-percent">0%</span></span>
+                </div>
+                <button id="reset-progress" class="text-xs bg-red-500/20 border border-red-500/50 text-red-400 px-3 py-1 rounded-md hover:bg-red-500/30 transition-colors">
+                    Сбросить прогресс
+                </button>
+            </div>
+        </div>
+        <div class="mt-2 max-w-7xl mx-auto">
+            <div class="w-full bg-slate-700 rounded-full h-1.5">
+                <div id="progress-bar" class="progress-bar h-1.5 rounded-full bg-gradient-to-r from-green-500 to-blue-500" style="width: 0%"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col lg:flex-row gap-4">
+        <!-- Левая панель: Теория и навигация -->
+        <aside class="w-full lg:w-1/4 bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden">
+            <!-- Мобильные табы -->
+            <div class="mobile-tabs flex border-b border-slate-700 lg:hidden">
+                <button class="flex-1 py-3 px-2 text-sm font-medium border-b-2 border-blue-500 text-blue-400" data-panel="lessons">
+                    Уроки
+                </button>
+                <button class="flex-1 py-3 px-2 text-sm font-medium border-b-2 border-transparent text-slate-400" data-panel="lesson-content">
+                    Теория
+                </button>
+            </div>
+            
+            <!-- Список уроков -->
+            <div id="lessons-panel" class="p-4 overflow-y-auto custom-scrollbar flex-1">
+                <h2 class="text-xl font-semibold text-slate-100 mb-4">📚 Модуль: Основы Python</h2>
+                <div id="lessons-list" class="space-y-2">
+                    <!-- Уроки будут добавлены через JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Контент урока -->
+            <div id="lesson-content-panel" class="hidden lg:flex flex-1 flex-col overflow-hidden">
+                <div class="p-4 border-b border-slate-700">
+                    <h3 id="lesson-title" class="text-lg font-semibold text-slate-100"></h3>
+                </div>
+                <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    <div id="instructions" class="prose prose-invert max-w-none text-slate-300 text-sm"></div>
+                    <div class="mt-6 space-y-2">
+                        <h4 class="text-sm font-semibold text-slate-200">📋 Требования к заданию:</h4>
+                        <div id="requirements-list" class="text-xs text-slate-400 space-y-1"></div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Центральная панель: Редактор кода -->
+        <section class="w-full lg:w-1/2 bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+                <h2 class="text-xl font-semibold text-slate-100">💻 Python редактор</h2>
+                <div class="flex space-x-2">
+                    <button id="run-code" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center space-x-2 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Запустить</span>
+                    </button>
+                    <button id="check-code" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center space-x-2 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Проверить</span>
+                    </button>
+                    <button id="show-solution" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center space-x-2 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span>Решение</span>
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 p-4">
+                <textarea id="code-editor" class="w-full h-full"></textarea>
+            </div>
+        </section>
+
+        <!-- Правая панель: Вывод и тесты -->
+        <aside class="w-full lg:w-1/4 bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-slate-700">
+                <h2 class="text-xl font-semibold text-slate-100">📊 Результаты</h2>
+            </div>
+            
+            <div class="flex-1 flex flex-col overflow-hidden">
+                <!-- Консоль вывода -->
+                <div class="p-4 border-b border-slate-700">
+                    <h3 class="text-sm font-semibold text-slate-300 mb-2">Вывод программы:</h3>
+                    <div id="console-output" class="bg-slate-900 rounded-lg p-3 font-mono text-xs text-green-400 max-h-32 overflow-y-auto custom-scrollbar h-24"></div>
+                </div>
+                
+                <!-- Панель тестов -->
+                <div class="flex-1 p-4 overflow-hidden">
+                    <h3 class="text-sm font-semibold text-slate-300 mb-2">Результаты тестов:</h3>
+                    <div id="test-results" class="space-y-2 test-panel">
+                        <div class="text-xs text-slate-400">Запустите код для проверки</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Лоадер Pyodide -->
+    <div id="pyodide-loader" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="loader mx-auto mb-4"></div>
+            <h3 class="text-xl font-semibold text-slate-200">Загрузка Python движка...</h3>
+            <p class="text-sm text-slate-400">Подождите, пока Pyodide загружается в ваш браузер</p>
+        </div>
+    </div>
+
+    <!-- Уведомления -->
+    <div id="notification" class="fixed top-4 right-4 z-50 hidden">
+        <div class="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg transform transition-transform duration-300 scale-100">
+            <div class="flex items-center space-x-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span id="notification-text"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // ДАННЫЕ КУРСА PYTHON
+        // ============================================
+        
+        /**
+         * Модульная структура данных для курса Python.
+         * Для добавления новых уроков просто добавьте объект в массив `courseModule`.
+         * Каждый урок должен содержать: id, title, instructions, starterCode, tests, solution.
+         * 
+         * Структура теста:
+         * - description: описание теста для пользователя
+         * - testFunction: функция, которая возвращает true/false
+         * - errorMessage: сообщение при неудачном прохождении теста
+         */
+        
+        const courseModule = {
+            title: "Основы Python",
+            description: "Базовый модуль для изучения синтаксиса Python",
+            lessons: [
+                {
+                    id: "lesson-1",
+                    title: "1. Синтаксис Python и первая программа",
+                    instructions: `# Синтаксис Python
+
+Python — это язык программирования с простым и читаемым синтаксисом. В этом уроке вы научитесь:
+
+1. Писать простую программу на Python
+2. Выводить текст на экран с помощью функции \`print()\`
+3. Понимать структуру программы
+
+## Что такое Python?
+
+Python — это высокоуровневый язык программирования общего назначения, который:
+- Имеет простой и понятный синтаксис
+- Поддерживает несколько парадигм программирования
+- Имеет огромную стандартную библиотеку
+
+## Первая программа на Python
+
+Традиционно, первая программа выводит "Hello, World!" на экран:
+
+\`\`\`python
+print("Hello, World!")
+\`\`\`
+
+Функция \`print()\` выводит текст в консоль. Строка текста должна быть в кавычках.`,
+                    starterCode: `# Напишите вашу первую программу на Python
+# Выведите на экран: "Hello, World!"
+# Не забудьте про кавычки!
+`,
+                    tests: [
+                        {
+                            description: "Программа выводит 'Hello, World!'",
+                            testFunction: (output) => output.includes("Hello, World!"),
+                            errorMessage: "Программа должна выводить 'Hello, World!' на экран"
+                        },
+                        {
+                            description: "Используется функция print()",
+                            testFunction: (code) => code.includes("print("),
+                            errorMessage: "Необходимо использовать функцию print()"
+                        }
+                    ],
+                    solution: `print("Hello, World!")`
+                },
+                {
+                    id: "lesson-2",
+                    title: "2. Переменные и типы данных",
+                    instructions: `# Переменные и типы данных
+
+Переменные — это контейнеры для хранения данных. В Python не нужно указывать тип переменной явно.
+
+## Создание переменных
+
+\`\`\`python
+# Целое число (int)
+age = 25
+
+# Число с плавающей точкой (float)
+height = 1.75
+
+# Строка (str)
+name = "Иван"
+
+# Булево значение (bool)
+is_student = True
+\`\`\`
+
+## Типы данных в Python
+
+1. **int** — целые числа (5, -3, 1000)
+2. **float** — числа с плавающей точкой (3.14, -0.001)
+3. **str** — строки ("Привет", 'Мир')
+4. **bool** — логические значения (True, False)
+
+## Определение типа переменной
+
+Для определения типа переменной используйте функцию \`type()\`:
+
+\`\`\`python
+print(type(age))  # <class 'int'>
+print(type(name))  # <class 'str'>
+\`\`\``,
+                    starterCode: `# Создайте переменные разных типов
+age = 25  # Целое число
+height = 1.75  # Число с плавающей точкой
+name = "Иван"  # Строка
+is_student = True  # Булево значение
+
+# Выведите каждую переменную на отдельной строке
+print(age)
+print(height)
+print(name)
+print(is_student)
+
+# Определите и выведите тип каждой переменной
+print(type(age))
+print(type(height))
+print(type(name))
+print(type(is_student))
+`,
+                    tests: [
+                        {
+                            description: "Все переменные определены",
+                            testFunction: (output) => {
+                                return output.includes("25") && 
+                                       output.includes("1.75") && 
+                                       output.includes("Иван") && 
+                                       output.includes("True");
+                            },
+                            errorMessage: "Не все переменные определены или выведены"
+                        },
+                        {
+                            description: "Типы данных определены правильно",
+                            testFunction: (output) => {
+                                return output.includes("<class 'int'>") &&
+                                       output.includes("<class 'float'>") &&
+                                       output.includes("<class 'str'>") &&
+                                       output.includes("<class 'bool'>");
+                            },
+                            errorMessage: "Типы данных определены неправильно"
+                        }
+                    ],
+                    solution: `age = 25
+height = 1.75
+name = "Иван"
+is_student = True
+
+print(age)
+print(height)
+print(name)
+print(is_student)
+
+print(type(age))
+print(type(height))
+print(type(name))
+print(type(is_student))`
+                },
+                {
+                    id: "lesson-3",
+                    title: "3. Условные операторы if/else",
+                    instructions: `# Условные операторы if/else
+
+Условные операторы позволяют выполнять код в зависимости от условий.
+
+## Базовый синтаксис
+
+\`\`\`python
+if условие:
+    # Код выполняется, если условие истинно
+else:
+    # Код выполняется, если условие ложно
+\`\`\`
+
+## Пример
+
+\`\`\`python
+age = 18
+
+if age >= 18:
+    print("Вы совершеннолетний")
+else:
+    print("Вы несовершеннолетний")
+\`\`\`
+
+## Операторы сравнения
+
+- \`==\` — равно
+- \`!=\` — не равно
+- \`>\` — больше
+- \`<\` — меньше
+- \`>=\` — больше или равно
+- \`<=\` — меньше или равно
+
+## Логические операторы
+
+- \`and\` — логическое И
+- \`or\` — логическое ИЛИ
+- \`not\` — логическое НЕ`,
+                    starterCode: `# Проверьте, является ли число четным или нечетным
+number = 7
+
+if number % 2 == 0:
+    print("Число", number, "является четным")
+else:
+    print("Число", number, "является нечетным")
+
+# Проверьте, находится ли число в диапазоне от 1 до 10
+if number >= 1 and number <= 10:
+    print("Число", number, "находится в диапазоне от 1 до 10")
+else:
+    print("Число", number, "не находится в диапазоне от 1 до 10")
+`,
+                    tests: [
+                        {
+                            description: "Проверка на четность/нечетность",
+                            testFunction: (output) => {
+                                return output.includes("нечетным");
+                            },
+                            errorMessage: "Программа должна определять четность числа"
+                        },
+                        {
+                            description: "Проверка диапазона",
+                            testFunction: (output) => {
+                                return output.includes("находится в диапазоне");
+                            },
+                            errorMessage: "Программа должна проверять диапазон числа"
+                        }
+                    ],
+                    solution: `number = 7
+
+if number % 2 == 0:
+    print("Число", number, "является четным")
+else:
+    print("Число", number, "является нечетным")
+
+if number >= 1 and number <= 10:
+    print("Число", number, "находится в диапазоне от 1 до 10")
+else:
+    print("Число", number, "не находится в диапазоне от 1 до 10")`
+                },
+                {
+                    id: "lesson-4",
+                    title: "4. Списки и базовые операции",
+                    instructions: `# Списки в Python
+
+Списки — это упорядоченные изменяемые коллекции объектов.
+
+## Создание списка
+
+\`\`\`python
+# Пустой список
+empty_list = []
+
+# Список с числами
+numbers = [1, 2, 3, 4, 5]
+
+# Список с разными типами данных
+mixed = [1, "строка", 3.14, True]
+\`\`\`
+
+## Доступ к элементам
+
+\`\`\`python
+numbers = [1, 2, 3, 4, 5]
+
+print(numbers[0])  # Первый элемент: 1
+print(numbers[2])  # Третий элемент: 3
+print(numbers[-1])  # Последний элемент: 5
+\`\`\`
+
+## Операции со списками
+
+\`\`\`python
+numbers = [1, 2, 3, 4, 5]
+
+# Длина списка
+print(len(numbers))  # 5
+
+# Добавление элемента
+numbers.append(6)
+print(numbers)  # [1, 2, 3, 4, 5, 6]
+
+# Удаление элемента по индексу
+del numbers[0]
+print(numbers)  # [2, 3, 4, 5, 6]
+
+# Проверка наличия элемента
+print(3 in numbers)  # True
+\`\`\``,
+                    starterCode: `# Создайте список с 5 элементами
+fruits = ["яблоко", "банан", "апельсин", "киви", "манго"]
+
+# Выведите первый и последний элементы
+print("Первый элемент:", fruits[0])
+print("Последний элемент:", fruits[-1])
+
+# Добавьте новый элемент в конец списка
+fruits.append("виноград")
+print("После добавления:", fruits)
+
+# Удалите первый элемент из списка
+del fruits[0]
+print("После удаления:", fruits)
+
+# Проверьте, есть ли 'банан' в списке
+print("'банан' в списке:", "банан" in fruits)
+
+# Выведите длину списка
+print("Длина списка:", len(fruits))
+`,
+                    tests: [
+                        {
+                            description: "Список создан и содержит 5 элементов",
+                            testFunction: (output) => {
+                                return output.includes("Первый элемент:") && 
+                                       output.includes("Последний элемент:");
+                            },
+                            errorMessage: "Список должен содержать минимум 5 элементов"
+                        },
+                        {
+                            description: "Элемент добавлен в список",
+                            testFunction: (output) => {
+                                return output.includes("После добавления:");
+                            },
+                            errorMessage: "Элемент должен быть добавлен в список"
+                        },
+                        {
+                            description: "Элемент удален из списка",
+                            testFunction: (output) => {
+                                return output.includes("После удаления:");
+                            },
+                            errorMessage: "Элемент должен быть удален из списка"
+                        }
+                    ],
+                    solution: `fruits = ["яблоко", "банан", "апельсин", "киви", "манго"]
+
+print("Первый элемент:", fruits[0])
+print("Последний элемент:", fruits[-1])
+
+fruits.append("виноград")
+print("После добавления:", fruits)
+
+del fruits[0]
+print("После удаления:", fruits)
+
+print("'банан' в списке:", "банан" in fruits)
+print("Длина списка:", len(fruits))`
+                },
+                {
+                    id: "lesson-5",
+                    title: "5. Словари и работа с данными",
+                    instructions: `# Словари в Python
+
+Словари — это неупорядоченные коллекции пар ключ-значение.
+
+## Создание словаря
+
+\`\`\`python
+# Пустой словарь
+empty_dict = {}
+
+# Словарь с данными
+person = {
+    "имя": "Иван",
+    "возраст": 25,
+    "город": "Москва"
+}
+\`\`\`
+
+## Доступ к значениям
+
+\`\`\`python
+person = {
+    "имя": "Иван",
+    "возраст": 25
+}
+
+print(person["имя"])  # Иван
+print(person["возраст"])  # 25
+
+# Альтернативный способ
+print(person.get("имя"))  # Иван
+\`\`\`
+
+## Операции со словарями
+
+\`\`\`python
+person = {
+    "имя": "Иван",
+    "возраст": 25
+}
+
+# Добавление новой пары ключ-значение
+person["профессия"] = "Программист"
+
+# Изменение существующего значения
+person["возраст"] = 26
+
+# Удаление элемента
+del person["город"]
+
+# Проверка наличия ключа
+print("имя" in person)  # True
+
+# Получение всех ключей и значений
+print(person.keys())  # dict_keys(['имя', 'возраст', 'профессия'])
+print(person.values())  # dict_values(['Иван', 26, 'Программист'])
+\`\`\``,
+                    starterCode: `# Создайте словарь с информацией о книге
+book = {
+    "title": "Мастер и Маргарита",
+    "author": "Михаил Булгаков",
+    "year": 1967,
+    "genre": "Роман"
+}
+
+# Выведите название книги и автора
+print("Название:", book["title"])
+print("Автор:", book["author"])
+
+# Добавьте новую пару ключ-значение
+book["pages"] = 480
+print("Количество страниц:", book["pages"])
+
+# Измените год издания
+book["year"] = 1966
+print("Год издания:", book["year"])
+
+# Проверьте, есть ли ключ 'genre'
+print("Жанр присутствует:", "genre" in book)
+
+# Выведите все ключи словаря
+print("Ключи словаря:", list(book.keys()))
+`,
+                    tests: [
+                        {
+                            description: "Словарь создан с необходимыми ключами",
+                            testFunction: (output) => {
+                                return output.includes("Название:") && 
+                                       output.includes("Автор:");
+                            },
+                            errorMessage: "Словарь должен содержать ключи 'title' и 'author'"
+                        },
+                        {
+                            description: "Новый ключ добавлен в словарь",
+                            testFunction: (output) => {
+                                return output.includes("Количество страниц:");
+                            },
+                            errorMessage: "В словарь должен быть добавлен ключ 'pages'"
+                        },
+                        {
+                            description: "Значение ключа изменено",
+                            testFunction: (output) => {
+                                return output.includes("Год издания:");
+                            },
+                            errorMessage: "Значение ключа 'year' должно быть изменено"
+                        }
+                    ],
+                    solution: `book = {
+    "title": "Мастер и Маргарита",
+    "author": "Михаил Булгаков",
+    "year": 1967,
+    "genre": "Роман"
+}
+
+print("Название:", book["title"])
+print("Автор:", book["author"])
+
+book["pages"] = 480
+print("Количество страниц:", book["pages"])
+
+book["year"] = 1966
+print("Год издания:", book["year"])
+
+print("Жанр присутствует:", "genre" in book)
+print("Ключи словаря:", list(book.keys()))`
+                }
+            ]
+        };
+
+        // ============================================
+        // ИНИЦИАЛИЗАЦИЯ И ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+        // ============================================
+        
+        let pyodide = null;
+        let currentLessonIndex = 0;
+        let editor = null;
+        let isLessonCompleted = false;
+        
+        // Элементы DOM
+        const lessonsList = document.getElementById('lessons-list');
+        const instructionsEl = document.getElementById('instructions');
+        const requirementsList = document.getElementById('requirements-list');
+        const lessonTitle = document.getElementById('lesson-title');
+        const codeEditor = document.getElementById('code-editor');
+        const consoleOutput = document.getElementById('console-output');
+        const testResults = document.getElementById('test-results');
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercent = document.getElementById('progress-percent');
+        
+        // Инициализация приложения
+        document.addEventListener('DOMContentLoaded', async function() {
+            await initializePyodide();
+            initializeCodeMirror();
+            renderLessons();
+            loadLesson(0);
+            loadProgressFromStorage();
+        });
+        
+        // ============================================
+        // ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ PYODIDE
+        // ============================================
+        
+        async function initializePyodide() {
+            const loader = document.getElementById('pyodide-loader');
+            try {
+                // Показать лоадер
+                loader.style.display = 'flex';
+                
+                // Загрузить Pyodide
+                pyodide = await loadPyodide({
+                    indexURL: "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/"
+                });
+                
+                // Скрыть лоадер
+                loader.style.display = 'none';
+                
+                showNotification("Python движок успешно загружен!");
+                
+            } catch (error) {
+                console.error('Ошибка загрузки Pyodide:', error);
+                loader.style.display = 'none';
+                
+                // Показать сообщение об ошибке
+                consoleOutput.innerHTML = `
+                    <div style="color: #ef4444;">
+                        <strong>Ошибка загрузки Python движка:</strong> ${error.message}<br>
+                        Попробуйте обновить страницу или проверьте подключение к интернету.
+                    </div>
+                `;
+            }
+        }
+        
+        // ============================================
+        // ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ CODEMIRROR
+        // ============================================
+        
+        function initializeCodeMirror() {
+            editor = CodeMirror.fromTextArea(codeEditor, {
+                mode: 'python',
+                theme: 'material-darker',
+                lineNumbers: true,
+                indentUnit: 4,
+                tabSize: 4,
+                lineWrapping: true,
+                autofocus: true,
+                extraKeys: {
+                    "Ctrl-Space": "autocomplete",
+                    "Ctrl-Enter": function() { runCode(); },
+                    "Cmd-Enter": function() { runCode(); }
+                }
+            });
+            
+            // Обработка изменений в редакторе
+            editor.on('change', function() {
+                saveUserCode();
+            });
+        }
+        
+        // ============================================
+        // ФУНКЦИИ РЕНДЕРИНГА УРОКОВ
+        // ============================================
+        
+        function renderLessons() {
+            lessonsList.innerHTML = '';
+            
+            courseModule.lessons.forEach((lesson, index) => {
+                const lessonItem = document.createElement('button');
+                lessonItem.className = `w-full text-left p-3 rounded-lg transition-colors ${
+                    index === currentLessonIndex 
+                        ? 'bg-blue-600 border border-blue-500' 
+                        : 'bg-slate-700 border border-slate-600 hover:bg-slate-600'
+                }`;
+                
+                lessonItem.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium">${lesson.title}</span>
+                        ${lesson.completed ? 
+                            `<span class="ml-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </span>` : ''
+                        }
+                    </div>
+                `;
+                
+                lessonItem.onclick = () => {
+                    loadLesson(index);
+                    
+                    // На мобильных показать контент урока
+                    if (window.innerWidth < 768) {
+                        document.querySelectorAll('[data-panel]').forEach(btn => {
+                            btn.classList.remove('border-blue-500', 'text-blue-400');
+                            btn.classList.add('border-transparent', 'text-slate-400');
+                        });
+                        document.querySelector('[data-panel="lesson-content"]').classList.add('border-blue-500', 'text-blue-400');
+                        document.querySelector('[data-panel="lesson-content"]').classList.remove('border-transparent', 'text-slate-400');
+                        
+                        document.getElementById('lessons-panel').classList.add('hidden');
+                        document.getElementById('lesson-content-panel').classList.remove('hidden');
+                        document.getElementById('lesson-content-panel').classList.add('flex');
+                    }
+                };
+                
+                lessonsList.appendChild(lessonItem);
+            });
+        }
+        
+        function loadLesson(index) {
+            const lesson = courseModule.lessons[index];
+            currentLessonIndex = index;
+            
+            // Обновить заголовок
+            lessonTitle.textContent = lesson.title;
+            
+            // Отрендерить инструкции (Markdown)
+            instructionsEl.innerHTML = marked.parse(lesson.instructions);
+            
+            // Отрендерить требования
+            requirementsList.innerHTML = '';
+            lesson.tests.forEach(test => {
+                const li = document.createElement('li');
+                li.textContent = test.description;
+                requirementsList.appendChild(li);
+            });
+            
+            // Загрузить код пользователя или стартовый код
+            const savedCode = localStorage.getItem(`code_${lesson.id}`);
+            editor.setValue(savedCode || lesson.starterCode);
+            
+            // Очистить вывод и тесты
+            consoleOutput.innerHTML = '';
+            testResults.innerHTML = '<div class="text-xs text-slate-400">Запустите код для проверки</div>';
+            
+            // Обновить список уроков
+            renderLessons();
+        }
+        
+        // ============================================
+        // ФУНКЦИИ ВЫПОЛНЕНИЯ КОДА
+        // ============================================
+        
+        async function runCode() {
+            if (!pyodide) {
+                consoleOutput.innerHTML = '<div style="color: #ef4444;">Python движок не загружен. Перезагрузите страницу.</div>';
+                return;
+            }
+            
+            const code = editor.getValue();
+            consoleOutput.innerHTML = '';
+            
+            try {
+                // Перенаправить stdout и stderr
+                pyodide.runPython(`
+                    import sys
+                    import io
+                    sys.stdout = io.StringIO()
+                    sys.stderr = io.StringIO()
+                `);
+                
+                // Выполнить код пользователя
+                await pyodide.runPythonAsync(code);
+                
+                // Получить вывод
+                const stdout = pyodide.runPython("sys.stdout.getvalue()");
+                const stderr = pyodide.runPython("sys.stderr.getvalue()");
+                
+                // Показать вывод
+                if (stdout) {
+                    consoleOutput.innerHTML += `<div style="color: #22c55e;">${stdout}</div>`;
+                }
+                
+                if (stderr) {
+                    consoleOutput.innerHTML += `<div style="color: #ef4444;">${stderr}</div>`;
+                }
+                
+                // Сохранить код пользователя
+                saveUserCode();
+                
+            } catch (error) {
+                consoleOutput.innerHTML += `<div style="color: #ef4444;">Ошибка выполнения: ${error.message}</div>`;
+            }
+        }
+        
+        async function checkCode() {
+            if (!pyodide) {
+                testResults.innerHTML = '<div class="text-red-500">Python движок не загружен</div>';
+                return;
+            }
+            
+            const lesson = courseModule.lessons[currentLessonIndex];
+            const code = editor.getValue();
+            let output = '';
+            
+            try {
+                // Перенаправить stdout
+                pyodide.runPython(`
+                    import sys
+                    import io
+                    sys.stdout = io.StringIO()
+                `);
+                
+                // Выполнить код
+                await pyodide.runPythonAsync(code);
+                output = pyodide.runPython("sys.stdout.getvalue()");
+                
+            } catch (error) {
+                output = `Ошибка: ${error.message}`;
+            }
+            
+            // Запустить тесты
+            let allPassed = true;
+            testResults.innerHTML = '';
+            
+            lesson.tests.forEach(test => {
+                const resultItem = document.createElement('div');
+                const testResult = test.testFunction(output);
+                
+                if (testResult) {
+                    resultItem.className = 'test-result test-pass p-3 rounded-lg border text-xs';
+                    resultItem.innerHTML = `
+                        <div class="flex items-center space-x-2">
+                            <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-green-400">${test.description}</span>
+                        </div>
+                    `;
+                } else {
+                    allPassed = false;
+                    resultItem.className = 'test-result test-fail p-3 rounded-lg border text-xs';
+                    resultItem.innerHTML = `
+                        <div class="flex items-center space-x-2">
+                            <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            <span class="text-red-400">${test.errorMessage}</span>
+                        </div>
+                    `;
+                }
+                
+                testResults.appendChild(resultItem);
+            });
+            
+            // Если все тесты пройдены
+            if (allPassed) {
+                showNotification("Все тесты пройдены успешно! 🎉");
+                markLessonAsCompleted();
+            } else {
+                showNotification("Некоторые тесты не пройдены. Проверьте код.", "error");
+            }
+        }
+        
+        // ============================================
+        // ФУНКЦИИ РАБОТЫ С ПРОГРЕССОМ
+        // ============================================
+        
+        function saveUserCode() {
+            const lesson = courseModule.lessons[currentLessonIndex];
+            localStorage.setItem(`code_${lesson.id}`, editor.getValue());
+        }
+        
+        function saveProgressToStorage() {
+            const progress = courseModule.lessons.map(lesson => ({
+                id: lesson.id,
+                completed: lesson.completed || false
+            }));
+            
+            localStorage.setItem('pythonLearnProgress', JSON.stringify(progress));
+            updateProgressBar();
+        }
+        
+        function loadProgressFromStorage() {
+            const savedProgress = localStorage.getItem('pythonLearnProgress');
+            
+            if (savedProgress) {
+                const progress = JSON.parse(savedProgress);
+                
+                progress.forEach(savedLesson => {
+                    const lesson = courseModule.lessons.find(l => l.id === savedLesson.id);
+                    if (lesson) {
+                        lesson.completed = savedLesson.completed;
+                    }
+                });
+                
+                updateProgressBar();
+                renderLessons();
+            }
+        }
+        
+        function markLessonAsCompleted() {
+            const lesson = courseModule.lessons[currentLessonIndex];
+            lesson.completed = true;
+            saveProgressToStorage();
+            renderLessons();
+        }
+        
+        function updateProgressBar() {
+            const completedCount = courseModule.lessons.filter(lesson => lesson.completed).length;
+            const totalCount = courseModule.lessons.length;
+            const percent = Math.round((completedCount / totalCount) * 100);
+            
+            progressBar.style.width = `${percent}%`;
+            progressPercent.textContent = `${percent}%`;
+        }
+        
+        function resetProgress() {
+            localStorage.removeItem('pythonLearnProgress');
+            courseModule.lessons.forEach(lesson => {
+                lesson.completed = false;
+                localStorage.removeItem(`code_${lesson.id}`);
+            });
+            
+            currentLessonIndex = 0;
+            renderLessons();
+            loadLesson(0);
+            updateProgressBar();
+            showNotification("Прогресс сброшен");
+        }
+        
+        // ============================================
+        // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+        // ============================================
+        
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notification-text');
+            const notificationIcon = notification.querySelector('svg');
+            
+            // Установить текст и стиль в зависимости от типа
+            notificationText.textContent = message;
+            
+            if (type === 'error') {
+                notification.classList.remove('bg-green-500');
+                notification.classList.add('bg-red-500');
+                notificationIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>';
+            } else {
+                notification.classList.remove('bg-red-500');
+                notification.classList.add('bg-green-500');
+                notificationIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>';
+            }
+            
+            // Показать уведомление
+            notification.classList.remove('hidden');
+            notification.classList.remove('scale-0');
+            notification.classList.add('scale-100');
+            
+            // Скрыть через 3 секунды
+            setTimeout(() => {
+                notification.classList.remove('scale-100');
+                notification.classList.add('scale-0');
+                setTimeout(() => {
+                    notification.classList.add('hidden');
+                }, 300);
+            }, 3000);
+        }
+        
+        // ============================================
+        // ОБРАБОТЧИКИ СОБЫТИЙ
+        // ============================================
+        
+        // Кнопка запуска кода
+        document.getElementById('run-code').addEventListener('click', runCode);
+        
+        // Кнопка проверки кода
+        document.getElementById('check-code').addEventListener('click', checkCode);
+        
+        // Кнопка показа решения
+        document.getElementById('show-solution').addEventListener('click', function() {
+            const lesson = courseModule.lessons[currentLessonIndex];
+            
+            // Спросить подтверждение
+            if (confirm("Вы уверены, что хотите увидеть решение?")) {
+                editor.setValue(lesson.solution);
+                showNotification("Решение загружено в редактор");
+            }
+        });
+        
+        // Кнопка сброса прогресса
+        document.getElementById('reset-progress').addEventListener('click', function() {
+            if (confirm("Вы уверены, что хотите сбросить весь прогресс?")) {
+                resetProgress();
+            }
+        });
+        
+        // Мобильные табы
+        document.querySelectorAll('[data-panel]').forEach(button => {
+            button.addEventListener('click', function() {
+                const panelId = this.getAttribute('data-panel');
+                
+                // Скрыть все панели
+                document.querySelectorAll('[id$="-panel"]').forEach(panel => {
+                    panel.classList.add('hidden');
+                });
+                
+                // Показать выбранную панель
+                document.getElementById(`${panelId}-panel`).classList.remove('hidden');
+                document.getElementById(`${panelId}-panel`).classList.add('flex');
+                
+                // Обновить активный таб
+                document.querySelectorAll('[data-panel]').forEach(btn => {
+                    btn.classList.remove('border-blue-500', 'text-blue-400');
+                    btn.classList.add('border-transparent', 'text-slate-400');
+                });
+                
+                this.classList.add('border-blue-500', 'text-blue-400');
+                this.classList.remove('border-transparent', 'text-slate-400');
+            });
+        });
+        
+        // Горячие клавиши
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+Enter для запуска кода
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                runCode();
+            }
+            
+            // Ctrl+Shift+Enter для проверки кода
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Enter') {
+                e.preventDefault();
+                checkCode();
+            }
+        });
+    </script>
+</body>
+</html>
