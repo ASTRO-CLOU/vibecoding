@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PyCamp — Интерактивное изучение Python</title>
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+<!-- Lucide icons -->
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+<!-- CodeMirror 5 (editor + Python mode + monokai theme) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+
+<!-- Pyodide — Python runtime, работающий в браузере через WebAssembly -->
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+
+<style>
+  :root {
+    --bg-0: #0a0a23;
+    --bg-1: #1b1b32;
+    --bg-2: #2a2a40;
+    --bg-3: #3b3b4f;
+    --accent: #acd157;     /* фирменный зелёный freeCodeCamp */
+    --accent-2: #ffc300;   /* жёлтый акцент */
+    --danger: #ff6b6b;
+    --text: #f5f6f7;
+    --muted: #a9b1c3;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg-0);
+    color: var(--text);
+    font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+  }
+  /* CodeMirror должен занимать всё пространство контейнера */
+  .CodeMirror {
+    height: 100% !important;
+    font-family: 'JetBrains Mono', 'Fira Code', Menlo, monospace;
+    font-size: 14px;
+    line-height: 1.55;
+    background: #111827 !important;
+  }
+  .cm-s-monokai.CodeMirror { background: #111827 !important; }
+
+  /* Скроллбары в тёмной теме */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg-1); }
+  ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: #52526e; }
+
+  /* Цвета панелей */
+  .panel { background: var(--bg-1); border: 1px solid var(--bg-2); }
+  .panel-header {
+    background: var(--bg-2);
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 12px;
+  }
+
+  /* Кнопки */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 0;
+    font-weight: 600; font-size: 13px;
+    border: none; cursor: pointer; transition: transform 0.05s, background 0.15s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--accent); color: #0a0a23; }
+  .btn-primary:hover { background: #c0e06a; }
+  .btn-primary:disabled { background: #6a7a3c; cursor: not-allowed; }
+  .btn-secondary { background: var(--bg-3); color: var(--text); }
+  .btn-secondary:hover { background: #4a4a66; }
+  .btn-danger { background: #4a1e1e; color: var(--danger); }
+  .btn-danger:hover { background: #5c2626; }
+
+  /* Список модулей / уроков */
+  .module-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; cursor: pointer; user-select: none;
+    background: var(--bg-2); font-weight: 700; font-size: 13px;
+    color: var(--accent-2);
+    border-bottom: 1px solid var(--bg-3);
+  }
+  .module-head:hover { background: #343450; }
+  .lesson {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px 10px 28px; cursor: pointer;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: var(--muted); font-size: 13px;
+  }
+  .lesson:hover { background: var(--bg-2); color: var(--text); }
+  .lesson.active {
+    background: #1e3a20; color: var(--accent);
+    border-left: 3px solid var(--accent); padding-left: 25px;
+  }
+  .lesson .check {
+    width: 16px; height: 16px; border: 1.5px solid var(--bg-3);
+    border-radius: 50%; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .lesson.done .check {
+    background: var(--accent); border-color: var(--accent); color: #0a0a23;
+  }
+
+  /* Тесты */
+  .test-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 12px; font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .test-icon { flex-shrink: 0; margin-top: 2px; }
+  .test-pass .test-icon { color: var(--accent); }
+  .test-fail .test-icon { color: var(--danger); }
+  .test-pending .test-icon { color: var(--muted); }
+
+  /* Консоль вывода */
+  #console-output {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word;
+    padding: 10px 14px;
+  }
+  .log-stdout { color: #e5e7eb; }
+  .log-stderr { color: var(--danger); }
+  .log-info { color: var(--accent-2); font-style: italic; }
+
+  /* Теория */
+  .theory h2 { font-size: 22px; color: var(--accent); margin-bottom: 10px; font-weight: 700; }
+  .theory h3 { font-size: 16px; color: var(--accent-2); margin: 14px 0 6px; font-weight: 700; }
+  .theory p  { margin-bottom: 10px; line-height: 1.6; color: #d1d5db; }
+  .theory ul { margin: 6px 0 12px 22px; list-style: disc; color: #d1d5db; line-height: 1.6; }
+  .theory code {
+    background: #111827; color: var(--accent);
+    padding: 2px 6px; border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  }
+  .theory pre {
+    background: #111827; padding: 10px 12px; margin: 8px 0;
+    border-left: 3px solid var(--accent);
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    overflow-x: auto; color: #e5e7eb;
+  }
+
+  /* Прогресс-бар */
+  .progress-track { background: var(--bg-2); height: 6px; border-radius: 3px; overflow: hidden; }
+  .progress-fill  { background: var(--accent); height: 100%; transition: width 0.4s; }
+
+  /* Loader оверлей */
+  #loader {
+    position: fixed; inset: 0; background: var(--bg-0);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 9999; gap: 20px;
+  }
+  .spinner {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 4px solid var(--bg-3); border-top-color: var(--accent);
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Адаптив */
+  @media (max-width: 1024px) {
+    .main-grid { grid-template-columns: 1fr !important; grid-template-rows: auto auto auto !important; }
+    #sidebar { max-height: 40vh; }
+    #editor-pane, #console-pane { min-height: 360px; }
+  }
+
+  /* Мобильная кнопка переключения вкладок */
+  .tab-btn { padding: 8px 14px; font-size: 13px; cursor: pointer; border: none; background: transparent; color: var(--muted); }
+  .tab-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- Загрузочный экран: ждём инициализацию Pyodide -->
+<div id="loader">
+  <div class="spinner"></div>
+  <div class="text-xl font-bold text-white">Инициализация Python-среды...</div>
+  <div class="text-sm" style="color: var(--muted);" id="loader-status">Загрузка Pyodide WebAssembly (~10 МБ)</div>
+</div>
+
+<!-- Верхняя панель навигации -->
+<header class="panel" style="border-left:0;border-right:0;border-top:0;">
+  <div class="flex items-center justify-between px-4 py-3">
+    <div class="flex items-center gap-3">
+      <i data-lucide="terminal" class="w-6 h-6" style="color:var(--accent)"></i>
+      <div class="text-xl font-bold" style="color:var(--accent)">PyCamp</div>
+      <div class="hidden sm:block text-xs px-2 py-1 rounded" style="background:var(--bg-3);color:var(--muted)">Python в браузере</div>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="hidden md:flex items-center gap-2">
+        <span class="text-xs" style="color:var(--muted)">Прогресс:</span>
+        <div class="progress-track" style="width:160px">
+          <div class="progress-fill" id="progress-bar" style="width:0%"></div>
+        </div>
+        <span class="text-xs font-mono" id="progress-text" style="color:var(--accent)">0/0</span>
+      </div>
+      <button class="btn btn-secondary" id="btn-reset-all" title="Сбросить весь прогресс">
+        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        <span class="hidden sm:inline">Сброс</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Главная сетка: sidebar | editor | console -->
+<main class="main-grid" style="display:grid; grid-template-columns: 280px 1fr 360px; height: calc(100vh - 58px);">
+
+  <!-- ====== ЛЕВАЯ КОЛОНКА: модули + теория ====== -->
+  <aside id="sidebar" class="panel flex flex-col overflow-hidden" style="border-left:0;border-bottom:0;">
+    <div class="panel-header px-4 py-2 flex items-center gap-2">
+      <i data-lucide="book-open" class="w-4 h-4"></i> Учебный план
+    </div>
+    <div id="curriculum" class="overflow-y-auto" style="max-height: 40vh;"></div>
+
+    <div class="panel-header px-4 py-2 flex items-center gap-2">
+      <i data-lucide="file-text" class="w-4 h-4"></i> Урок
+    </div>
+    <div id="lesson-content" class="theory overflow-y-auto p-4 flex-1"></div>
+  </aside>
+
+  <!-- ====== ЦЕНТРАЛЬНАЯ КОЛОНКА: редактор кода ====== -->
+  <section id="editor-pane" class="panel flex flex-col overflow-hidden" style="border-bottom:0;">
+    <div class="panel-header px-4 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i data-lucide="code" class="w-4 h-4"></i> Редактор
+        <span class="text-xs font-normal" style="color:var(--muted)" id="editor-filename">—</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn btn-secondary" id="btn-run" title="Запустить код (Ctrl+Enter)">
+          <i data-lucide="play" class="w-4 h-4"></i> Запустить
+        </button>
+        <button class="btn btn-primary" id="btn-test" title="Проверить решение (Ctrl+Shift+Enter)">
+          <i data-lucide="check-circle-2" class="w-4 h-4"></i> Проверить
+        </button>
+        <button class="btn btn-danger" id="btn-reset" title="Сбросить код урока к начальному">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+    <div class="flex-1 relative">
+      <textarea id="code-editor"></textarea>
+    </div>
+    <div class="px-4 py-2 text-xs flex items-center gap-4" style="background:var(--bg-2); color:var(--muted)">
+      <span class="flex items-center gap-1"><i data-lucide="save" class="w-3 h-3"></i> Автосохранение</span>
+      <span id="save-status">готово</span>
+      <span class="ml-auto flex items-center gap-1"><i data-lucide="keyboard" class="w-3 h-3"></i> Ctrl+Enter: запуск</span>
+    </div>
+  </section>
+
+  <!-- ====== ПРАВАЯ КОЛОНКА: консоль + тесты ====== -->
+  <aside id="console-pane" class="panel flex flex-col overflow-hidden" style="border-right:0;border-bottom:0;">
+    <!-- Вкладки: Вывод / Тесты -->
+    <div class="flex" style="background:var(--bg-2); border-bottom:1px solid var(--bg-3)">
+      <button class="tab-btn active" data-tab="output">
+        <i data-lucide="terminal" class="w-4 h-4 inline mr-1"></i> Вывод
+      </button>
+      <button class="tab-btn" data-tab="tests">
+        <i data-lucide="check-square" class="w-4 h-4 inline mr-1"></i>
+        Тесты <span id="tests-badge" class="text-xs ml-1 px-1.5 py-0.5 rounded" style="background:var(--bg-3); color:var(--muted)">0/0</span>
+      </button>
+    </div>
+
+    <div id="tab-output" class="flex-1 overflow-y-auto">
+      <div id="console-output"><span class="log-info">// Здесь появится вывод программы. Нажмите «Запустить».</span></div>
+    </div>
+
+    <div id="tab-tests" class="flex-1 overflow-y-auto hidden">
+      <div id="tests-list"></div>
+    </div>
+
+    <div class="px-3 py-2 flex items-center gap-2" style="background:var(--bg-2); border-top:1px solid var(--bg-3)">
+      <button class="btn btn-secondary text-xs" id="btn-clear-console">
+        <i data-lucide="trash-2" class="w-3 h-3"></i> Очистить
+      </button>
+      <span id="runtime-info" class="text-xs ml-auto" style="color:var(--muted)"></span>
+    </div>
+  </aside>
+</main>
+
+<script>
+/* =========================================================================
+   PyCamp — интерактивная платформа для изучения Python
+   Архитектура:
+     1. COURSE_DATA  — статическая "база" уроков (легко расширять)
+     2. State        — реактивное состояние приложения + localStorage
+     3. PyRunner     — обёртка над Pyodide с перехватом stdout/stderr
+     4. UI           — рендеринг curriculum, теории, тестов, консоли
+     5. Editor       — CodeMirror instance + горячие клавиши
+   ========================================================================= */
+
+/* ---------- 1. БАЗА УРОКОВ -------------------------------------------------
+   Каждый lesson:
+     id, moduleId, title, theory (HTML), task (HTML), initialCode,
+     tests: [{ desc, code }] — code это Python-выражение/блок с assert
+--------------------------------------------------------------------------- */
+const COURSE_DATA = {
+  modules: [
+    { id: 'm1', title: '1. Переменные и типы данных' },
+    { id: 'm2', title: '2. Операторы и выражения' },
+    { id: 'm3', title: '3. Условные операторы' },
+    { id: 'm4', title: '4. Циклы' },
+    { id: 'm5', title: '5. Функции' },
+  ],
+  lessons: [
+    /* ==================== МОДУЛЬ 1: ПЕРЕМЕННЫЕ ==================== */
+    {
+      id: 'l1_1', moduleId: 'm1',
+      title: 'Привет, Python!',
+      theory: `
+        <h2>Привет, Python!</h2>
+        <p>Python — один из самых популярных языков программирования. Он читается почти как английский текст, и именно поэтому с него удобно начинать.</p>
+        <h3>Функция <code>print()</code></h3>
+        <p>Чтобы вывести что-то на экран, используется встроенная функция <code>print()</code>. Текст (строка) заключается в кавычки — одинарные или двойные.</p>
+        <pre>print("Привет, мир!")
+print('Python — это круто')</pre>
+        <h3>Комментарии</h3>
+        <p>Строки, начинающиеся с <code>#</code>, интерпретатор игнорирует. Они нужны для пояснений к коду.</p>
+        <pre># Это комментарий, он не выполняется
+print("А это уже код")</pre>
+      `,
+      task: `
+        <h3>Задание</h3>
+        <p>Выведи на экран фразу <code>Hello, Python!</code> (точно в таком виде, с учётом регистра и знаков препинания).</p>
+      `,
+      initialCode: `# Напиши свой код ниже\n`,
+      tests: [
+        { desc: 'Программа выводит "Hello, Python!"', code: `
+assert __stdout.strip() == "Hello, Python!", f"Ожидалось 'Hello, Python!', получено: {repr(__stdout.strip())}"
+` }
+      ]
+    },
+    {
+      id: 'l1_2', moduleId: 'm1',
+      title: 'Переменные и присваивание',
+      theory: `
+        <h2>Переменные</h2>
+        <p>Переменная — это именованная ячейка памяти. В Python не нужно объявлять тип переменной — он определяется автоматически.</p>
+        <pre>name = "Алиса"
+age = 25
+height = 1.68
+is_student = True</pre>
+        <h3>Правила именования</h3>
+        <ul>
+          <li>Имя может содержать буквы, цифры и символ <code>_</code></li>
+          <li>Не может начинаться с цифры</li>
+          <li>Регистр имеет значение: <code>name</code> и <code>Name</code> — разные переменные</li>
+          <li>По соглашению используют <code>snake_case</code></li>
+        </ul>
+        <h3>Функция <code>type()</code></h3>
+        <p>Возвращает тип значения:</p>
+        <pre>x = 42
+print(type(x))   # &lt;class 'int'&gt;</pre>
+      `,
+      task: `
+        <h3>Задание</h3>
+        <p>Создай три переменные:</p>
+        <ul>
+          <li><code>name</code> — строка со своим именем</li>
+          <li><code>age</code> — целое число (возраст)</li>
+          <li><code>is_coder</code> — булево значение <code>True</code></li>
+        </ul>
+        <p>Затем выведи их на экран в одну строку через пробел.</p>
+      `,
+      initialCode: `# Создай переменные и выведи их\n`,
+      tests: [
+        { desc: 'Существует переменная name (str)', code: `assert "name" in globals() and isinstance(name, str), "Переменная name должна быть строкой"` },
+        { desc: 'Существует переменная age (int)',  code: `assert "age" in globals() and isinstance(age, int), "Переменная age должна быть целым числом"` },
+        { desc: 'Существует переменная is_coder (bool)', code: `assert "is_coder" in globals() and is_coder is True, "Переменная is_coder должна быть True"` },
+        { desc: 'В выводе есть все три значения',  code: `
+out = __stdout.strip()
+assert name in out and str(age) in out and "True" in out, f"Выведи все три значения через пробел. Получено: {repr(out)}"
+` }
+      ]
+    },
+
+    /* ==================== МОДУЛЬ 2: ОПЕРАТОРЫ ==================== */
+    {
+      id: 'l2_1', moduleId: 'm2',
+      title: 'Арифметические операции',
+      theory: `
+        <h2>Арифметика в Python</h2>
+        <p>Python поддерживает все стандартные математические операции:</p>
+        <pre>a = 10
+b = 3
+print(a + b)   # 13 — сложение
+print(a - b)   # 7  — вычитание
+print(a * b)   # 30 — умножение
+print(a / b)   # 3.333... — деление (всегда float!)
+print(a // b)  # 3  — целочисленное деление
+print(a % b)   # 1  — остаток от деления
+print(a ** b)  # 1000 — возведение в степень</pre>
+        <h3>Строки и числа</h3>
+        <p>Если нужно объединить строку и число, используй f-строки:</p>
+        <pre>x = 5
+print(f"Результат: {x}")</pre>
+      `,
+      task: `
+        <h3>Задание</h3>
+        <p>Вычисли площадь прямоугольника со сторонами <code>a = 7</code> и <code>b = 13</code>. Сохрани результат в переменной <code>area</code> и выведи её значение.</p>
+      `,
+      initialCode: `a = 7\nb = 13\n# Вычисли площадь и выведи её\n`,
+      tests: [
+        { desc: 'Переменная area существует', code: `assert "area" in globals(), "Создай переменную area"` },
+        { desc: 'area = 91', code: `assert area == 91, f"Ожидалось 91, получено {area}"` },
+        { desc: 'Значение выведено на экран', code: `assert "91" in __stdout, "Выведи значение area с помощью print()"` }
+      ]
+    },
+
+    /* ==================== МОДУЛЬ 3: УСЛОВИЯ ==================== */
+    {
+      id: 'l3_1', moduleId: 'm3',
+      title: 'Условный оператор if/else',
+      theory: `
+        <h2>Условия в Python</h2>
+        <p>Конструкция <code>if</code> позволяет выполнять код только при выполнении условия:</p>
+        <pre>age = 18
+if age >= 18:
+    print("Доступ разрешён")
+elif age > 0:
+    print("Слишком молод")
+else:
+    print("Некорректный возраст")</pre>
+        <h3>Операторы сравнения</h3>
+        <ul>
+          <li><code>==</code> равно, <code>!=</code> не равно</li>
+          <li><code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code></li>
+        </ul>
+        <h3>Важно: отступы!</h3>
+        <p>В Python блоки кода выделяются <b>отступами</b> (4 пробела), а не фигурными скобками.</p>
+      `,
+      task: `
+        <h3>Задание</h3>
+        <p>Напиши программу, которая получает число в переменной <code>temperature</code> (уже задано) и выводит:</p>
+        <ul>
+          <li><code>hot</code> — если температура больше 25</li>
+          <li><code>cold</code> — если меньше 10</li>
+          <li><code>normal</code> — во всех остальных случаях</li>
+        </ul>
+      `,
+      initialCode: `# Переменная temperature уже задана тестами (или значение по умолчанию ниже)
+try:
+    temperature
+except NameError:
+    temperature = 30
+
+# Напиши условие if/elif/else ниже:
+`,
+      tests: [
+        { desc: 'temperature = 30 → вывод "hot"', code: `
+import io, sys
+buf = io.StringIO(); old = sys.stdout; sys.stdout = buf
+exec(__user_code, {"temperature": 30})
+sys.stdout = old
+assert buf.getvalue().strip() == "hot", f"Для 30 ожидалось 'hot', получено {repr(buf.getvalue().strip())}"
+` },
+        { desc: 'temperature = 5  → вывод "cold"', code: `
+import io, sys
+buf = io.StringIO(); old = sys.stdout; sys.stdout = buf
+exec(__user_code, {"temperature": 5})
+sys.stdout = old
+assert buf.getvalue().strip() == "cold", f"Для 5 ожидалось 'cold', получено {repr(buf.getvalue().strip())}"
+` },
+        { desc: 'temperature = 18 → вывод "normal"', code: `
+import io, sys
+buf = io.StringIO(); old = sys.stdout; sys.stdout = buf
+exec(__user_code, {"temperature": 18})
+sys.stdout = old
+assert buf.getvalue().strip() == "normal", f"Для 18 ожидалось 'normal', получено {repr(buf.getvalue().strip())}"
+` }
+      ]
+    },
+
+    /* ==================== МОДУЛЬ 4: ЦИКЛЫ ==================== */
+    {
+      id: 'l4_1', moduleId: 'm4',
+      title: 'Цикл for и range()',
+      theory: `
+        <h2>Цикл for</h2>
+        <p>Цикл <code>for</code> в Python перебирает элементы последовательности. Чаще всего его используют с функцией <code>range()</code>:</p>
+        <pre>for i in range(5):
+    print(i)   # выведет 0, 1, 2, 3, 4</pre>
+        <h3>Варианты range</h3>
+        <pre>range(5)        # 0..4
+range(2, 7)     # 2..6
+range(0, 10, 2) # 0, 2, 4, 6, 8</pre>
+        <h3>Суммирование</h3>
+        <pre>total = 0
+for i in range(1, 11):
+    total += i
+print(total)  # 55</pre>
+      `,
+      task: `
+        <h3>Задание</h3>
+        <p>Используя цикл <code>for</code>, вычисли сумму чисел от 1 до 100 включительно. Результат сохрани в переменной <code>total</code> и выведи её.</p>
+      `,
+      initialCode: `total = 0\n# Напиши цикл для суммирования\n\nprint(total)\n`,
+      tests: [
+        { desc: 'Используется цикл for', code: `assert "for " in __user_code, "Используй цикл for"` },
+        { desc: 'total = 5050', code: `assert total == 5050, f"Ожидалось 5050, получено {total}"` },
+        { desc: 'Вывод содержит 5050', code: `assert "5050" in __stdout` }
+      ]
+    },
+
+    /* ==================== МОДУЛЬ 5: ФУНКЦИИ (каркас) ==================== */
+    {
+      id: 'l5_1', moduleId: 'm5',
+      title: 'Определение функции',
+      theory: `
+        <h2>Функции в Python</h2>
+        <p>Функция — это именованный блок кода, который можно вызывать многократно.</p>
+        <pre>def greet(name):
+    return f"Привет, {name}!"
+
+print(greet("Мария"))  # Привет, Мария!</pre>
+        <h3>Параметры и возврат значения</h3>
+        <ul>
+          <li><code>def</code> — ключевое слово для определения</li>
+          <li><code>return</code> — возврат значения</li>
+          <li>Без <code>return</code> функция возвращает <code>None</code></li>
+        </ul>
+      `,
+      task: `
+        <h3>Задание</h3>
+        <p>Напиши функцию <code>square(n)</code>, которая возвращает квадрат числа <code>n</code>. Затем выведи результат вызова <code>square(9)</code>.</p>
+      `,
+      initialCode: `def square(n):\n    pass  # TODO\n\nprint(square(9))\n`,
+      tests: [
+        { desc: 'Функция square определена', code: `assert "def square" in __user_code` },
+        { desc: 'square(9) == 81', code: `assert square(9) == 81, f"square(9) = {square(9)}"` },
+        { desc: 'square(0) == 0',  code: `assert square(0) == 0` },
+        { desc: 'square(-4) == 16', code: `assert square(-4) == 16` }
+      ]
+    },
+    {
+      id: 'l5_2', moduleId: 'm5',
+      title: 'Аргументы по умолчанию',
+      theory: `
+        <h2>Значения параметров по умолчанию</h2>
+        <pre>def power(base, exp=2):
+    return base ** exp
+
+print(power(3))     # 9
+print(power(3, 3))  # 27</pre>
+        <p>Если при вызове аргумент не передан — используется значение по умолчанию.</p>
+      `,
+      task: `
+        <h3>Задание</h3>
+        <p>Напиши функцию <code>greet(name, greeting="Привет")</code>, которая возвращает строку вида <code>"Привет, Иван!"</code>. Значение <code>greeting</code> по умолчанию — <code>"Привет"</code>.</p>
+      `,
+      initialCode: `def greet(name, greeting="Привет"):\n    pass  # TODO\n`,
+      tests: [
+        { desc: 'greet("Аня") возвращает "Привет, Аня!"', code: `assert greet("Аня") == "Привет, Аня!"` },
+        { desc: 'greet("Иван", "Здравствуй") работает',   code: `assert greet("Иван", "Здравствуй") == "Здравствуй, Иван!"` }
+      ]
+    }
+  ]
+};
+
+/* ---------- 2. СОСТОЯНИЕ И ХРАНИЛИЩЕ ------------------------------------ */
+const STORAGE_KEY = 'pycamp_progress_v1';
+
+const State = {
+  currentLessonId: null,
+  progress: {}, // { lessonId: { completed, code, lastSaved } }
+
+  load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) this.progress = JSON.parse(raw);
+    } catch (e) { console.warn('Progress load failed', e); }
+  },
+  save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.progress));
+      UI.flashSaveStatus();
+    } catch (e) { console.warn('Progress save failed', e); }
+  },
+  getLessonProgress(lessonId) {
+    return this.progress[lessonId] || { completed: false, code: null };
+  },
+  setLessonCode(lessonId, code) {
+    this.progress[lessonId] = { ...this.getLessonProgress(lessonId), code, lastSaved: Date.now() };
+    this.save();
+  },
+  markCompleted(lessonId) {
+    this.progress[lessonId] = { ...this.getLessonProgress(lessonId), completed: true };
+    this.save();
+    UI.renderCurriculum();
+    UI.updateProgressBar();
+  },
+  resetAll() {
+    if (!confirm('Сбросить весь прогресс? Написанный код будет удалён.')) return;
+    this.progress = {};
+    localStorage.removeItem(STORAGE_KEY);
+    UI.renderCurriculum();
+    UI.updateProgressBar();
+    UI.loadLesson(this.currentLessonId, /*forceInitial*/ true);
+  }
+};
+
+/* ---------- 3. PYTHON RUNTIME (Pyodide) ----------------------------------- */
+const PyRunner = {
+  pyodide: null,
+  ready: false,
+
+  async init(onStatus) {
+    onStatus('Загрузка Pyodide WebAssembly (~10 МБ)...');
+    this.pyodide = await loadPyodide({
+      indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/'
+    });
+    onStatus('Среда готова. Инициализация редактора...');
+    this.ready = true;
+  },
+
+  /**
+   * Выполняет код пользователя, возвращает { stdout, stderr, error, globals }.
+   * Перехватывает sys.stdout в StringIO для проверки выводов в тестах.
+   */
+  async run(userCode, { captureOutput = true, timeoutMs = 5000 } = {}) {
+    if (!this.ready) throw new Error('Pyodide не загружен');
+    const py = this.pyodide;
+
+    const wrapper = `
+import sys, io, traceback
+__stdout_buf = io.StringIO()
+__stderr_buf = io.StringIO()
+__old_out = sys.stdout
+__old_err = sys.stderr
+sys.stdout = __stdout_buf
+sys.stderr = __stderr_buf
+__result = {"error": None}
+try:
+${userCode.split('\n').map(l => '    ' + l).join('\n')}
+except SystemExit:
+    __result["error"] = "SystemExit"
+except Exception as e:
+    __result["error"] = traceback.format_exc()
+finally:
+    sys.stdout = __old_out
+    sys.stderr = __old_err
+__result["stdout"] = __stdout_buf.getvalue()
+__result["stderr"] = __stderr_buf.getvalue()
+__result
+`;
+    try {
+      const proxy = await py.runPythonAsync(wrapper);
+      // dict_converter превращает PyProxy-словарь в обычный JS-объект
+      const result = proxy.toJs({ dict_converter: Object.fromEntries });
+      if (proxy && typeof proxy.destroy === 'function') proxy.destroy();
+      return result;
+    } catch (e) {
+      return { stdout: '', stderr: String(e.message || e), error: String(e.message || e) };
+    }
+  },
+
+  /**
+   * Запускает код пользователя и серию тестов в одном namespace.
+   * Каждый тест — это Python-код, кидающий AssertionError при провале.
+   * В namespace теста доступны: __stdout, __user_code, все переменные пользователя.
+   */
+  async runTests(userCode, tests) {
+    const results = [];
+
+    // Сначала выполняем код пользователя один раз, чтобы собрать stdout и namespace
+    const userResult = await this.run(userCode);
+    if (userResult.error) {
+      // Код не запускаается — все тесты фейлятся
+      return tests.map(t => ({ ...t, passed: false, reason: `Ошибка в коде: ${userResult.error.split('\n').slice(-2).join(' ')}` }));
+    }
+
+    // Для каждого теста собираем общий скрипт: user_code + test_code
+    for (const t of tests) {
+      const script = `
+import sys, io, traceback
+__stdout_buf = io.StringIO()
+__old_out = sys.stdout
+sys.stdout = __stdout_buf
+__test_error = None
+try:
+${userCode.split('\n').map(l => '    ' + l).join('\n')}
+    __user_code = ${JSON.stringify(userCode)}
+    __stdout = __stdout_buf.getvalue()
+${t.code.split('\n').map(l => '    ' + l).join('\n')}
+except AssertionError as e:
+    __test_error = str(e) if str(e) else "Assertion failed"
+except Exception as e:
+    __test_error = traceback.format_exc()
+finally:
+    sys.stdout = __old_out
+__test_error
+`;
+      try {
+        // Pyodide автоматически конвертирует Python-примитивы в JS-аналоги:
+        // None → null, str → string. Поэтому сравнение с null работает корректно.
+        const err = await this.pyodide.runPythonAsync(script);
+        results.push({
+          ...t,
+          passed: err === null,
+          reason: err ? String(err) : null
+        });
+      } catch (e) {
+        results.push({ ...t, passed: false, reason: String(e.message || e) });
+      }
+    }
+    return results;
+  }
+};
+
+/* ---------- 4. UI: рендеринг ---------------------------------------------- */
+const UI = {
+  editor: null,
+
+  /* --- Curriculum (список модулей и уроков) --- */
+  renderCurriculum() {
+    const root = document.getElementById('curriculum');
+    root.innerHTML = '';
+    for (const mod of COURSE_DATA.modules) {
+      const lessons = COURSE_DATA.lessons.filter(l => l.moduleId === mod.id);
+      const modEl = document.createElement('div');
+      modEl.innerHTML = `
+        <div class="module-head">
+          <i data-lucide="chevron-down" class="w-4 h-4"></i>
+          <span>${mod.title}</span>
+          <span class="ml-auto text-xs font-normal" style="color:var(--muted)">
+            ${lessons.filter(l => State.getLessonProgress(l.id).completed).length}/${lessons.length}
+          </span>
+        </div>
+      `;
+      const list = document.createElement('div');
+      for (const lesson of lessons) {
+        const prog = State.getLessonProgress(lesson.id);
+        const div = document.createElement('div');
+        div.className = 'lesson' + (prog.completed ? ' done' : '') + (lesson.id === State.currentLessonId ? ' active' : '');
+        div.innerHTML = `
+          <span class="check">${prog.completed ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}</span>
+          <span>${lesson.title}</span>
+        `;
+        div.onclick = () => this.loadLesson(lesson.id);
+        list.appendChild(div);
+      }
+      modEl.appendChild(list);
+      root.appendChild(modEl);
+    }
+    lucide.createIcons();
+  },
+
+  /* --- Загрузка урока в интерфейс --- */
+  loadLesson(lessonId, forceInitial = false) {
+    const lesson = COURSE_DATA.lessons.find(l => l.id === lessonId);
+    if (!lesson) return;
+    State.currentLessonId = lessonId;
+
+    // Теория + задание
+    document.getElementById('lesson-content').innerHTML =
+      lesson.theory + '<hr style="border-color:var(--bg-3); margin:16px 0">' + lesson.task;
+
+    // Код в редакторе: либо сохранённый, либо initial
+    const prog = State.getLessonProgress(lessonId);
+    const code = (!forceInitial && prog.code != null) ? prog.code : lesson.initialCode;
+    this.editor.setValue(code);
+    this.editor.clearHistory();
+    this.editor.refresh();
+
+    document.getElementById('editor-filename').textContent = lesson.title;
+
+    // Сброс консоли и тестов
+    document.getElementById('console-output').innerHTML =
+      '<span class="log-info">// Нажми «Запустить» (Ctrl+Enter), чтобы выполнить код.</span>';
+    this.renderTests(lesson.tests.map(t => ({ ...t, passed: null })));
+
+    this.renderCurriculum();
+    this.editor.focus();
+  },
+
+  /* --- Консоль --- */
+  printToConsole(text, kind = 'stdout') {
+    const out = document.getElementById('console-output');
+    const span = document.createElement('div');
+    span.className = 'log-' + kind;
+    span.textContent = text;
+    out.appendChild(span);
+    out.scrollTop = out.scrollHeight;
+  },
+  clearConsole() {
+    document.getElementById('console-output').innerHTML = '';
+  },
+
+  /* --- Список тестов --- */
+  renderTests(tests) {
+    const list = document.getElementById('tests-list');
+    list.innerHTML = '';
+    let passed = 0, total = tests.length;
+    for (const t of tests) {
+      const state = t.passed === null ? 'pending' : (t.passed ? 'pass' : 'fail');
+      if (t.passed) passed++;
+      const icon = state === 'pass' ? 'check-circle-2'
+                 : state === 'fail' ? 'x-circle'
+                 : 'circle';
+      const el = document.createElement('div');
+      el.className = 'test-item test-' + state;
+      el.innerHTML = `
+        <span class="test-icon"><i data-lucide="${icon}" class="w-4 h-4"></i></span>
+        <div>
+          <div>${t.desc}</div>
+          ${t.reason ? `<div class="text-xs mt-1" style="color:var(--danger)">${escapeHtml(t.reason)}</div>` : ''}
+        </div>
+      `;
+      list.appendChild(el);
+    }
+    document.getElementById('tests-badge').textContent = `${passed}/${total}`;
+    document.getElementById('tests-badge').style.background =
+      passed === total && total > 0 ? 'var(--accent)' : 'var(--bg-3)';
+    document.getElementById('tests-badge').style.color =
+      passed === total && total > 0 ? '#0a0a23' : 'var(--muted)';
+    lucide.createIcons();
+  },
+
+  /* --- Прогресс-бар --- */
+  updateProgressBar() {
+    const total = COURSE_DATA.lessons.length;
+    const done  = COURSE_DATA.lessons.filter(l => State.getLessonProgress(l.id).completed).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.getElementById('progress-text').textContent = `${done}/${total}`;
+  },
+
+  flashSaveStatus() {
+    const el = document.getElementById('save-status');
+    el.textContent = '✓ сохранено';
+    el.style.color = 'var(--accent)';
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(() => {
+      el.textContent = 'готово';
+      el.style.color = '';
+    }, 1500);
+  },
+
+  /* --- Переключение вкладок Вывод / Тесты --- */
+  switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.getElementById('tab-output').classList.toggle('hidden', name !== 'output');
+    document.getElementById('tab-tests').classList.toggle('hidden', name !== 'tests');
+  },
+
+  /* --- Блокировка кнопок во время выполнения --- */
+  setBusy(busy) {
+    document.getElementById('btn-run').disabled = busy;
+    document.getElementById('btn-test').disabled = busy;
+  }
+};
+
+/* ---------- 5. УТИЛИТЫ -------------------------------------------------- */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+/* debounce для автосохранения кода */
+function debounce(fn, delay = 600) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+}
+
+/* ---------- 6. ДЕЙСТВИЯ ПОЛЬЗОВАТЕЛЯ ------------------------------------- */
+async function actionRun() {
+  const code = UI.editor.getValue();
+  if (!code.trim()) return;
+  UI.clearConsole();
+  UI.printToConsole('▶ Запуск...', 'info');
+  UI.setBusy(true);
+  document.getElementById('runtime-info').textContent = 'выполняется...';
+  const t0 = performance.now();
+  try {
+    const res = await PyRunner.run(code);
+    const dt = ((performance.now() - t0) / 1000).toFixed(2);
+    UI.clearConsole();
+    if (res.stdout) UI.printToConsole(res.stdout, 'stdout');
+    if (res.stderr) UI.printToConsole(res.stderr, 'stderr');
+    if (res.error)  UI.printToConsole(res.error, 'stderr');
+    if (!res.stdout && !res.stderr && !res.error) {
+      UI.printToConsole('(программа ничего не вывела)', 'info');
+    }
+    document.getElementById('runtime-info').textContent = `выполнено за ${dt}с`;
+  } finally {
+    UI.setBusy(false);
+  }
+}
+
+async function actionTest() {
+  const lesson = COURSE_DATA.lessons.find(l => l.id === State.currentLessonId);
+  if (!lesson) return;
+  const code = UI.editor.getValue();
+  UI.clearConsole();
+  UI.printToConsole('▶ Запуск тестов...', 'info');
+  UI.setBusy(true);
+
+  const results = await PyRunner.runTests(code, lesson.tests);
+  UI.clearConsole();
+
+  const passedCount = results.filter(r => r.passed).length;
+  if (passedCount === results.length) {
+    UI.printToConsole(`🎉 Все тесты пройдены! (${passedCount}/${results.length})`, 'info');
+    State.markCompleted(lesson.id);
+    // Переход к следующему уроку через 1.2 сек
+    const idx = COURSE_DATA.lessons.findIndex(l => l.id === lesson.id);
+    if (idx >= 0 && idx < COURSE_DATA.lessons.length - 1) {
+      setTimeout(() => {
+        if (confirm('Отлично! Перейти к следующему уроку?')) {
+          UI.loadLesson(COURSE_DATA.lessons[idx + 1].id);
+        }
+      }, 800);
+    }
+  } else {
+    UI.printToConsole(`✗ Пройдено тестов: ${passedCount}/${results.length}`, 'stderr');
+    for (const r of results.filter(r => !r.passed)) {
+      UI.printToConsole(`  • ${r.desc}`, 'stderr');
+      if (r.reason) UI.printToConsole(`    ${r.reason}`, 'stderr');
+    }
+  }
+
+  UI.renderTests(results);
+  UI.switchTab('tests');
+  UI.setBusy(false);
+}
+
+function actionReset() {
+  const lesson = COURSE_DATA.lessons.find(l => l.id === State.currentLessonId);
+  if (!lesson) return;
+  if (!confirm('Сбросить код этого урока к начальному?')) return;
+  UI.editor.setValue(lesson.initialCode);
+  State.setLessonCode(lesson.id, lesson.initialCode);
+}
+
+/* ---------- 7. ИНИЦИАЛИЗАЦИЯ -------------------------------------------- */
+async function bootstrap() {
+  const statusEl = document.getElementById('loader-status');
+
+  // 1. Загружаем прогресс
+  State.load();
+
+  // 2. Загружаем Pyodide (асинхронно)
+  try {
+    await PyRunner.init(msg => { statusEl.textContent = msg; });
+  } catch (e) {
+    statusEl.textContent = 'Ошибка загрузки Pyodide: ' + e.message;
+    return;
+  }
+
+  // 3. Инициализируем CodeMirror
+  UI.editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+    mode: 'python',
+    theme: 'monokai',
+    lineNumbers: true,
+    matchBrackets: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    lineWrapping: false,
+    autofocus: true,
+    extraKeys: {
+      'Ctrl-Enter': actionRun,
+      'Cmd-Enter':  actionRun,
+      'Shift-Ctrl-Enter': actionTest,
+      'Shift-Cmd-Enter':  actionTest,
+      'Tab': (cm) => cm.replaceSelection('    ', 'end')
+    }
+  });
+
+  // 4. Автосохранение кода при редактировании
+  const saveNow = debounce(() => {
+    if (State.currentLessonId) {
+      State.setLessonCode(State.currentLessonId, UI.editor.getValue());
+    }
+  }, 500);
+  UI.editor.on('change', saveNow);
+
+  // 5. Рендерим curriculum и первый урок
+  UI.renderCurriculum();
+  UI.updateProgressBar();
+  const firstLesson = COURSE_DATA.lessons[0];
+  UI.loadLesson(firstLesson.id);
+
+  // 6. Обработчики кнопок
+  document.getElementById('btn-run').onclick  = actionRun;
+  document.getElementById('btn-test').onclick = actionTest;
+  document.getElementById('btn-reset').onclick = actionReset;
+  document.getElementById('btn-reset-all').onclick = () => State.resetAll();
+  document.getElementById('btn-clear-console').onclick = () => UI.clearConsole();
+
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.onclick = () => UI.switchTab(b.dataset.tab);
+  });
+
+  // 7. Скрываем лоадер
+  document.getElementById('loader').style.display = 'none';
+}
+
+// Запуск приложения после загрузки DOM
+window.addEventListener('DOMContentLoaded', bootstrap);
+</script>
+</body>
+</html>
